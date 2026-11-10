@@ -96,7 +96,7 @@ import CoreML
                 await message("Phone code not configured", "The encrypted phone code is missing. No input was sent.")
                 return
             }
-            pin = try Self.open(JSONDecoder().decode(Vault.self, from: Data(contentsOf: vaultURL)), password: password)
+            pin = try Self.open(JSONDecoder().decode(Vault.self, from: PrivateSettingsStore.read(from: vaultURL)), password: password)
         } catch {
             await message("Could not unlock encrypted phone code", "No input was sent. The encrypted record may belong to an older password."); return
         }

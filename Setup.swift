@@ -1,6 +1,7 @@
 import Cocoa
 import CryptoKit
 import UniformTypeIdentifiers
+import Darwin
 
 struct AppConfiguration: Codable {
     var version = 1
@@ -8,9 +9,67 @@ struct AppConfiguration: Codable {
     let approvedPaths: [String]
     var approvedBundleIDs: Set<String>? = nil
 
+    /// Validate user-edited configuration before it can enable focus restrictions.
+    func validated() throws -> Self {
+        let bytes = Array(unlockDigest.utf8)
+        let absoluteAppPaths = approvedPaths.allSatisfy { path in
+            (path as NSString).isAbsolutePath && !path.contains("\0") &&
+                URL(fileURLWithPath: path).pathExtension.lowercased() == "app"
+        }
+        let invalidIdentifierCharacters = CharacterSet.whitespacesAndNewlines.union(.controlCharacters)
+        let validBundleIDs = approvedBundleIDs?.allSatisfy { identifier in
+            !identifier.isEmpty && !identifier.unicodeScalars.contains(where: invalidIdentifierCharacters.contains)
+        } ?? true
+        guard version == 1, bytes.count == 64,
+              bytes.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }),
+              absoluteAppPaths, validBundleIDs else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        // SHA256 output is lowercase. Accept manually entered uppercase hex
+        // without creating a configuration whose password can never match.
+        return Self(version: version, unlockDigest: unlockDigest.lowercased(), approvedPaths: approvedPaths,
+                    approvedBundleIDs: approvedBundleIDs)
+    }
+
     var approvedIDs: Set<String> {
         (approvedBundleIDs ?? Set(approvedPaths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
             .union(["local.harmony.focus", "com.apple.finder", "com.apple.systempreferences"])
+    }
+}
+
+/// Persist configuration and encrypted vaults without exposing replacement
+/// files, following symlinks, or removing the previous file before success.
+enum PrivateSettingsStore {
+    static func prepareDirectory(_ directory: URL) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let attributes = try fm.attributesOfItem(atPath: directory.path)
+        guard attributes[.type] as? FileAttributeType == .typeDirectory else { throw CocoaError(.fileWriteInvalidFileName) }
+        try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+    }
+
+    static func read(from url: URL) throws -> Data {
+        try prepareDirectory(url.deletingLastPathComponent())
+        let fm = FileManager.default
+        let attributes = try fm.attributesOfItem(atPath: url.path)
+        guard attributes[.type] as? FileAttributeType == .typeRegular else { throw CocoaError(.fileReadInvalidFileName) }
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return try Data(contentsOf: url)
+    }
+
+    static func write(_ data: Data, to url: URL) throws {
+        let fm = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        try prepareDirectory(directory)
+        let temporary = directory.appendingPathComponent(".settings-" + UUID().uuidString)
+        defer { try? fm.removeItem(at: temporary) }
+        try data.write(to: temporary, options: .withoutOverwriting)
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        // rename(2) atomically replaces a file (including a symlink itself),
+        // without following the destination or leaving a missing-file window.
+        guard Darwin.rename(temporary.path, url.path) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 }
 
@@ -33,18 +92,22 @@ struct AppConfiguration: Codable {
         return alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
     }
 
+    static func loadConfiguration(from url: URL) throws -> AppConfiguration {
+        let original = try JSONDecoder().decode(AppConfiguration.self, from: PrivateSettingsStore.read(from: url))
+        var config = try original.validated()
+        if config.approvedBundleIDs == nil {
+            config.approvedBundleIDs = config.approvedIDs
+        }
+        if original.unlockDigest != config.unlockDigest || original.approvedBundleIDs != config.approvedBundleIDs {
+            try PrivateSettingsStore.write(JSONEncoder().encode(config), to: url)
+        }
+        return config
+    }
+
     static func loadOrCreate(defaultPaths: [String]) -> AppConfiguration? {
         if FileManager.default.fileExists(atPath: configurationURL.path) {
             do {
-                var config = try JSONDecoder().decode(AppConfiguration.self, from: Data(contentsOf: configurationURL))
-                guard config.version == 1, config.unlockDigest.count == 64,
-                      config.unlockDigest.allSatisfy({ $0.isHexDigit }) else { throw CocoaError(.fileReadCorruptFile) }
-                if config.approvedBundleIDs == nil {
-                    config.approvedBundleIDs = config.approvedIDs
-                    try JSONEncoder().encode(config).write(to: configurationURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configurationURL.path)
-                }
-                return config
+                return try loadConfiguration(from: configurationURL)
             } catch {
                 notice("Could not load Harmony settings", "Your settings were left untouched. Ask your setup agent to repair configuration.json from your backup before starting a new session.")
                 return nil
@@ -88,10 +151,7 @@ struct AppConfiguration: Codable {
                 let config = AppConfiguration(unlockDigest: digest(password), approvedPaths: paths,
                                                  approvedBundleIDs: Set(paths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
                 do {
-                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-                    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
-                    try JSONEncoder().encode(config).write(to: configurationURL, options: .atomic)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configurationURL.path)
+                    try PrivateSettingsStore.write(JSONEncoder().encode(config.validated()), to: configurationURL)
                     notice("Setup saved", "Start Harmony again when you are ready. In System Settings, allow Harmony to control apps so window minimization works. Screen Recording is needed only for the optional phone helper.")
                     return config
                 } catch { notice("Setup could not be saved", error.localizedDescription); return nil }
@@ -158,8 +218,7 @@ struct AppConfiguration: Codable {
         do {
             let vault = try PhoneBridge.seal(pin, password: password)
             let target = folder.appendingPathComponent("phone-vault.json")
-            try JSONEncoder().encode(vault).write(to: target, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
+            try PrivateSettingsStore.write(JSONEncoder().encode(vault), to: target)
             notice("Phone helper configured", "Start Harmony, open iPhone Mirroring to the empty Screen Time passcode prompt, then choose Enter phone passcode in the eye menu.")
         } catch { notice("Could not save phone setup", error.localizedDescription) }
     }

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 func check(_ condition: @autoclosure () -> Bool, _ message: String) {
     if !condition() { fatalError(message) }
@@ -17,6 +18,15 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--send-message
     let accepted = HarmonyCommandChannel.send(HarmonyCommand(action: "extend", hours: 4, minutes: 30), timeout: 1.5,
         namespace: CommandLine.arguments[2], onMessage: { message = $0 })
     exit(accepted && message == "extended result" ? 0 : 1)
+}
+if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--exec-lock" {
+    let directory = URL(fileURLWithPath: CommandLine.arguments[2])
+    let lock = try HarmonyInstanceLock(directory: directory)
+    guard lock.acquire() else { exit(2) }
+    try Data().write(to: directory.appendingPathComponent("ready"))
+    var arguments: [UnsafeMutablePointer<CChar>?] = [strdup("sleep"), strdup("3"), nil]
+    withExtendedLifetime(lock) { _ = execv("/bin/sleep", &arguments) }
+    exit(3)
 }
 let lockCommand = HarmonyCommand(action: "lock", hours: 1)
 for locked in [false, true] {
@@ -122,6 +132,30 @@ check(first!.acquire(), "first instance cannot acquire")
 check(!second.acquire(), "duplicate instance acquired")
 first = nil
 check(second.acquire(), "released instance lock not reusable")
+let linkedDirectory = directory.appendingPathComponent("linked")
+try FileManager.default.createDirectory(at: linkedDirectory, withIntermediateDirectories: true)
+let unrelated = directory.appendingPathComponent("unrelated")
+try Data("leave alone".utf8).write(to: unrelated)
+try FileManager.default.createSymbolicLink(at: linkedDirectory.appendingPathComponent("instance.lock"), withDestinationURL: unrelated)
+var refusedLinkedLock = false
+do { _ = try HarmonyInstanceLock(directory: linkedDirectory) } catch { refusedLinkedLock = true }
+check(refusedLinkedLock, "singleton followed a symbolic lock file")
+let execDirectory = directory.appendingPathComponent("exec-inheritance")
+let execContender = try HarmonyInstanceLock(directory: execDirectory)
+let execChild = Process()
+execChild.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+execChild.arguments = ["--exec-lock", execDirectory.path]
+try execChild.run()
+let ready = execDirectory.appendingPathComponent("ready")
+let readyDeadline = Date().addingTimeInterval(2)
+while !FileManager.default.fileExists(atPath: ready.path) && execChild.isRunning && Date() < readyDeadline { usleep(10_000) }
+let childReady = FileManager.default.fileExists(atPath: ready.path)
+let releasedForExec = childReady && execContender.acquire(timeout: 1)
+let childStillRunning = execChild.isRunning
+if execChild.isRunning { execChild.terminate() }
+execChild.waitUntilExit()
+check(releasedForExec && childStillRunning, "a child executable inherited and retained the singleton lock")
+print("Singleton ownership passed: symbolic lock rejection and release across exec")
 print("Lifecycle core passed: strict command validation, sleep/clock-safe deadlines, singleton lock.")
 
 let namespace = "local.harmony.lifecycle-test." + UUID().uuidString

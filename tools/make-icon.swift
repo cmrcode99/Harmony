@@ -5,8 +5,8 @@ import Foundation
 func renderIcon(size: Int) throws -> Data {
     let image = NSImage(size: NSSize(width: size, height: size))
     image.lockFocus()
-    defer { image.unlockFocus() }
-    let transform = AffineTransform(scale: CGFloat(size) / 1024)
+    let transform = NSAffineTransform()
+    transform.scale(by: CGFloat(size) / 1024)
     transform.concat()
     let background = NSBezierPath(roundedRect: NSRect(x: 100, y: 100, width: 824, height: 824), xRadius: 180, yRadius: 180)
     let top = NSColor(srgbRed: 23/255, green: 59/255, blue: 70/255, alpha: 1)
@@ -26,6 +26,7 @@ func renderIcon(size: Int) throws -> Data {
     NSBezierPath(ovalIn: NSRect(x: 420, y: 420, width: 184, height: 184)).fill()
     pale.setFill()
     NSBezierPath(ovalIn: NSRect(x: 516, y: 518, width: 44, height: 44)).fill()
+    image.unlockFocus()
     var proposed = NSRect(origin: .zero, size: image.size)
     guard let cgImage = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
           let data = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:]) else {

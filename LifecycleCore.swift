@@ -139,7 +139,7 @@ final class HarmonyInstanceLock {
     private var descriptor: Int32 = -1
     init(directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        descriptor = Darwin.open(directory.appendingPathComponent("instance.lock").path, O_CREAT | O_RDWR, 0o600)
+        descriptor = Darwin.open(directory.appendingPathComponent("instance.lock").path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0o600)
         if descriptor < 0 { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
     }
     func acquire(timeout: TimeInterval = 0) -> Bool {
