@@ -21,7 +21,7 @@ If Harmony is already running, finish its session before updating. Installation 
 
 ### 2. Help the user finish the setup window
 
-Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Your videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.
+Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Allowed videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.
 
 Explain: “Harmony force-quits apps outside your allowed list during focus sessions. Save work before starting. It opens allowed apps and minimizes their windows once. Allowed cmux stays visible; other terminals may be minimized. You can reopen any allowed app.”
 

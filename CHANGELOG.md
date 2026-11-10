@@ -8,6 +8,8 @@ Production cleanup for the first public beta. This section describes development
 
 - Restored the original character icon as the app and repository default.
 
+- Redesigned settings with native Liquid Glass, separate app/video views, and shorter menu labels.
+
 - Added window-control permission status and an automatic minimization retry after approval.
 - Preserved source video files during library cleanup and made damaged playlists repairable in settings.
 - Preserved an existing signing identity during source updates to avoid unnecessary permission resets.
