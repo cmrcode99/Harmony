@@ -22,8 +22,6 @@ jobs:
         include:
           - runner: macos-26
             arch: arm64
-          - runner: macos-26-intel
-            arch: x86_64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
@@ -58,7 +56,7 @@ jobs:
     needs: macos
     runs-on: ubuntu-latest
     steps:
-      - name: Require both native checks
+      - name: Require the Apple Silicon check
         env:
           RESULT: ${{ needs.macos.result }}
         run: test "$RESULT" = success

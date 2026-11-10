@@ -28,7 +28,7 @@ Videos are copied into Harmony's local library. Removing one deletes only that c
 
 | | Requirements |
 | --- | --- |
-| Run the app | macOS 13 or later, with a build for your Mac's architecture |
+| Run the app | Apple Silicon Mac with macOS 13 or later |
 | Build from source | Xcode 26+ Command Line Tools / macOS SDK 26+, Swift, and Python 3 |
 | Optional phone helper | A Mac and iPhone that support [iPhone Mirroring](https://support.apple.com/120421) |
 

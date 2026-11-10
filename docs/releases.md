@@ -18,7 +18,7 @@ Record the macOS version, Mac architecture, commit, and scenarios tested in the 
 make share
 ```
 
-This creates a local ZIP and SHA-256 checksum in `dist/`; it does not upload anything. `HARMONY_ARCH=arm64` or `HARMONY_ARCH=x86_64` selects an architecture. The default is the current Mac. Use the package matching the recipient's Mac and verify the checksum from the directory containing the archive.
+This creates a local ZIP and SHA-256 checksum in `dist/`; it does not upload anything. Apple Silicon is the supported and tested target. Build on an Apple Silicon Mac (or set `HARMONY_ARCH=arm64`) and verify the checksum from the directory containing the archive.
 
 The default application icon is bundled at `assets/Harmony.icns`; `assets/Harmony.png` is its documentation preview. To use your own redistributable icon, set `HARMONY_ICON=/absolute/path/to/custom.icns`.
 
