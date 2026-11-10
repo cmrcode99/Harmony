@@ -280,6 +280,54 @@ private struct SettingsControlStyle: ViewModifier {
     }
 }
 
+/// Sidebar actions must fire on the first click, including in an inactive window.
+final class SettingsNavigationButton: NSButton {
+    var onSelect: (() -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setButtonType(.toggle)
+        bezelStyle = .rounded
+        imagePosition = .imageLeading
+        alignment = .left
+        target = self
+        action = #selector(selectSection)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    @objc private func selectSection() {
+        state = .on
+        onSelect?()
+    }
+}
+
+private struct SettingsTabButton: NSViewRepresentable {
+    let title: String
+    let symbol: String
+    let selected: Bool
+    let onSelect: () -> Void
+
+    func makeNSView(context: Context) -> SettingsNavigationButton {
+        SettingsNavigationButton(frame: .zero)
+    }
+
+    func updateNSView(_ button: SettingsNavigationButton, context: Context) {
+        button.title = title
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        button.font = .systemFont(ofSize: 13, weight: selected ? .semibold : .regular)
+        button.state = selected ? .on : .off
+        button.isBordered = selected
+        button.contentTintColor = selected ? .controlAccentColor : .labelColor
+        button.onSelect = onSelect
+    }
+}
+
+private final class SettingsHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 @MainActor struct HarmonySettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var model: HarmonySettingsModel
@@ -310,10 +358,6 @@ private struct SettingsControlStyle: ViewModifier {
         return true
     }
 
-    private var sectionBinding: Binding<SettingsSection?> {
-        Binding(get: { selection }, set: { if let section = $0 { selectedSection = section } })
-    }
-
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 9) {
@@ -321,12 +365,12 @@ private struct SettingsControlStyle: ViewModifier {
                     .resizable().scaledToFit().frame(width: 30, height: 30)
                 Text("Harmony").font(.system(size: 14, weight: .semibold))
             }.padding(.horizontal, 8).padding(.top, 8).padding(.bottom, 23)
-            List(selection: sectionBinding) {
-                Label("Allowed apps", systemImage: "square.grid.2x2").tag(SettingsSection.apps)
-                Label("Allowed videos", systemImage: "play.rectangle").tag(SettingsSection.videos)
-            }
-            .listStyle(.sidebar).scrollContentBackground(.hidden)
-            .font(.system(size: 13)).frame(height: 110)
+            SettingsTabButton(title: "Allowed apps", symbol: "square.grid.2x2", selected: selection == .apps) {
+                selectedSection = .apps
+            }.frame(height: 36)
+            SettingsTabButton(title: "Allowed videos", symbol: "play.rectangle", selected: selection == .videos) {
+                selectedSection = .videos
+            }.frame(height: 36)
             Spacer()
             if firstRun {
                 Text("SETUP").font(.system(size: 10, weight: .semibold)).tracking(1)
@@ -503,7 +547,7 @@ private struct SettingsControlStyle: ViewModifier {
         window.backgroundColor = .clear
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 760, height: 470)
-        window.contentView = NSHostingView(rootView: HarmonySettingsView(model: model, firstRun: firstRun, sessionPaused: sessionPaused, section: section))
+        window.contentView = SettingsHostingView(rootView: HarmonySettingsView(model: model, firstRun: firstRun, sessionPaused: sessionPaused, section: section))
         window.delegate = self
         model.finish = { [weak self] configuration in
             self?.complete(configuration)
