@@ -22,7 +22,8 @@ extension App {
 
     func updateWindowControlMenuItems(granted: Bool) {
         for item in [windowControlItem, applicationWindowControlItem].compactMap({ $0 }) {
-            item.title = granted ? "Window control enabled" : "Enable window control…"
+            item.title = "Enable window control"
+            item.isHidden = granted
             item.isEnabled = !granted
             item.toolTip = granted
                 ? "Harmony can minimize allowed app windows when a focus session starts."

@@ -35,7 +35,7 @@ struct AppIntegrationTests {
         let menu = menuProbe.makeStatusMenu()
         let titles = menu.items.map(\.title)
         let moveIndex = titles.firstIndex(of: "Move window")!
-        precondition(titles[moveIndex + 1] == "Allowed apps…" && titles[moveIndex + 2] == "Allowed videos…")
+        precondition(titles[moveIndex + 1] == "Allowed apps" && titles[moveIndex + 2] == "Allowed videos")
         precondition(menu.items[moveIndex + 1].action == #selector(App.openAllowedApps))
         precondition(menu.items[moveIndex + 2].action == #selector(App.openAllowedVideos))
         precondition(SettingsSection.apps.finderDirectory.path == "/Applications")
@@ -98,6 +98,12 @@ struct AppIntegrationTests {
         snapshot.update(from: statusMenu)
         precondition(snapshot.entries[2].toggle && snapshot.entries[2].checked,
                      "Modern menu lost the native mute checkmark")
+        statusMenu.items[0].isHidden = true
+        snapshot.update(from: statusMenu)
+        precondition(snapshot.entries.map(\.id) == [1, 2], "Hidden controls changed command indices")
+        action.isHidden = true
+        controller.performStatusMenuItem(2)
+        precondition(probe.calls == 1, "Modern menu dispatched a hidden action")
         withExtendedLifetime(subscription) {}
         print("PASS production menus: setup readiness, native app controls, eye-only timed exit, independent menu ownership")
         print("PASS modern status menu: original command dispatch, disabled/stale action rejection, change-only snapshots, toggle state")
@@ -111,14 +117,14 @@ struct AppIntegrationTests {
         controller.installApplicationMenu()
         controller.refreshWindowControlPermission()
         for item in [controller.windowControlItem!, controller.applicationWindowControlItem!] {
-            precondition(item.title == "Enable window control…" && item.isEnabled)
+            precondition(item.title == "Enable window control" && item.isEnabled && !item.isHidden)
             precondition(item.action == #selector(App.openWindowControlSettings))
             precondition(item.toolTip?.contains("Accessibility") == true)
         }
         controller.checkWindowControlPermission = { true }
         controller.refreshWindowControlPermission()
         for item in [controller.windowControlItem!, controller.applicationWindowControlItem!] {
-            precondition(item.title == "Window control enabled" && !item.isEnabled)
+            precondition(item.isHidden && !item.isEnabled, "Granted permission left an unnecessary menu row")
         }
         precondition(App.windowControlSettingsURL.scheme == "x-apple.systempreferences")
 

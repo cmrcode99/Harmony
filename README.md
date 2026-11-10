@@ -18,7 +18,7 @@ Your agent handles installation and verification. You choose your allowed apps, 
 
 ## Apps and videos, your way
 
-Choose **Allowed apps…** or **Allowed videos…** below **Move window** in the eye menu. Each opens the matching settings area and Finder, ready to drag files in. The application menu also has **Apps and videos…**, and `harmony setup` works while it is off. Drag applications from Finder into **Allowed apps**, and drop your own videos into **Your videos**. Add/remove buttons work too; the arrows change playback order. Finder and System Settings always stay allowed.
+Choose **Allowed apps** or **Allowed videos** below **Move window** in the eye menu. Each opens the matching settings area and Finder, ready to drag files in. The application menu also has **Apps and videos**, and `harmony setup` works while it is off. Drag applications from Finder into **Allowed apps**, and drop your own videos into **Your videos**. Add/remove buttons work too; the arrows change playback order. Finder and System Settings always stay allowed.
 
 <p align="center"><img src="docs/screenshots/settings.png" width="800" alt="Harmony settings with allowed applications and a video playlist"><br><em>Settings window with sample data.</em></p>
 
