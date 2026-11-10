@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import shutil
+import stat
 import sys
 
 
@@ -12,7 +13,9 @@ def available_playlist(root: Path) -> list:
     playlist = json.loads((root / 'media/playlist.json').read_text())
     if not isinstance(playlist, list) or not playlist:
         raise ValueError('The video playlist is empty or invalid.')
-    files, available = set(), []
+    if len(playlist) > 1024:
+        raise ValueError('The video playlist supports at most 1024 entries.')
+    files, identities, available = set(), set(), []
     for entry in playlist:
         if not isinstance(entry, dict):
             raise ValueError('Each playlist entry must describe a video.')
@@ -23,17 +26,28 @@ def available_playlist(root: Path) -> list:
         source = (root / relative).resolve()
         if relative.is_absolute() or '..' in relative.parts or source.suffix.lower() != '.mp4' or not source.is_relative_to(root):
             raise ValueError('Playlist videos must be local MP4 files inside the project.')
-        if name in files:
+        normalized_name = relative.as_posix()
+        if normalized_name in files:
             raise ValueError('Duplicate playlist file: ' + name)
-        files.add(name)
+        files.add(normalized_name)
         start = entry.get('startSeconds', 0)
-        if isinstance(start, bool) or not isinstance(start, (int, float)) or not math.isfinite(start) or start < 0:
+        try:
+            valid_start = not isinstance(start, bool) and isinstance(start, (int, float)) and math.isfinite(start) and start >= 0
+        except OverflowError:
+            valid_start = False
+        if not valid_start:
             raise ValueError('Video start times must be finite, nonnegative seconds.')
-        if not source.exists():
+        try:
+            metadata = source.stat()
+        except FileNotFoundError:
             continue
-        if not source.is_file() or source.stat().st_size == 0:
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size == 0:
             raise ValueError('Empty or invalid video: ' + name)
-        available.append(entry)
+        identity = (metadata.st_dev, metadata.st_ino)
+        if identity in identities:
+            raise ValueError('Duplicate playlist file: ' + name)
+        identities.add(identity)
+        available.append({**entry, 'file': normalized_name})
     if not available:
         raise FileNotFoundError('Add a local MP4 with ./setup.sh --video /path/to/video.mp4, or add videos listed in media/playlist.json.')
     return available
