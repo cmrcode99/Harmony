@@ -234,8 +234,8 @@ struct AppIntegrationTests {
             try library.save([one, two])
             let config = AppConfiguration(unlockDigest: String(repeating: "a", count: 64), approvedPaths: [])
             let model = HarmonySettingsModel(configuration: config, library: library)
-            model.selectedApp = HarmonySettingsModel.fixedApps[0]
-            model.removeApp()
+            model.selectedApps = [HarmonySettingsModel.fixedApps[0]]
+            model.removeApps()
             precondition(model.appPaths.contains(HarmonySettingsModel.fixedApps[0]))
             let application = root.appendingPathComponent("Editor.app/Contents")
             try FileManager.default.createDirectory(at: application, withIntermediateDirectories: true)
@@ -243,6 +243,24 @@ struct AppIntegrationTests {
             try info.write(to: application.appendingPathComponent("Info.plist"))
             model.addApps([application.deletingLastPathComponent(), application.deletingLastPathComponent()])
             precondition(model.appPaths.filter { $0.hasSuffix("Editor.app") }.count == 1)
+            let browser = root.appendingPathComponent("Browser.app/Contents")
+            try FileManager.default.createDirectory(at: browser, withIntermediateDirectories: true)
+            let browserInfo = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "test.harmony.browser", "CFBundlePackageType": "APPL"], format: .xml, options: 0)
+            try browserInfo.write(to: browser.appendingPathComponent("Info.plist"))
+            let editorPath = application.deletingLastPathComponent().path
+            let browserPath = browser.deletingLastPathComponent().path
+            model.addApps([browser.deletingLastPathComponent()])
+            model.selectedApps = [browserPath]
+            model.removeApps()
+            precondition(!model.appPaths.contains(browserPath) && model.appPaths.contains(editorPath), "Single removal changed the wrong apps")
+            model.addApps([browser.deletingLastPathComponent()])
+            model.selectedApps = [editorPath, browserPath, HarmonySettingsModel.fixedApps[0]]
+            precondition(model.removableSelectedApps == Set([editorPath, browserPath]))
+            model.removeApps()
+            precondition(model.selectedApps.isEmpty && !model.appPaths.contains(editorPath) && !model.appPaths.contains(browserPath), "Multiple app removal failed")
+            precondition(HarmonySettingsModel.fixedApps.allSatisfy(model.appPaths.contains), "Multiple removal removed a protected app")
+            precondition(FileManager.default.fileExists(atPath: editorPath) && FileManager.default.fileExists(atPath: browserPath), "Allowlist removal deleted an application")
+            model.addApps([application.deletingLastPathComponent()])
             model.selectedVideo = two.id
             model.moveVideo(-1)
             precondition(model.videos.map(\.id) == [two.id, one.id])
@@ -258,6 +276,7 @@ struct AppIntegrationTests {
             model.save()
             precondition(saved?.unlockDigest == config.unlockDigest, "Settings changed the recovery password")
             precondition(saved?.approvedIDs.contains("test.harmony.editor") == true)
+            precondition(saved?.approvedIDs.contains("test.harmony.browser") == false, "Removed application returned when saving")
             let restored = try library.load()
             precondition(restored == [two])
             precondition(FileManager.default.fileExists(atPath: first.path), "Removing a video deleted its original")

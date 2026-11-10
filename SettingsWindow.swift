@@ -27,7 +27,7 @@ enum SettingsSection: Equatable {
     @Published var appPaths: [String]
     @Published var videos: [LibraryVideo] = []
     @Published var useIncludedVideos = true
-    @Published var selectedApp: String?
+    @Published var selectedApps: Set<String> = []
     @Published var selectedVideo: String?
     @Published var busy = false
     @Published var message = ""
@@ -62,9 +62,15 @@ enum SettingsSection: Equatable {
         message = rejected ? "Choose application bundles (.app), or drag them here from Applications." : ""
     }
 
-    func removeApp() {
-        guard let selectedApp, !Self.fixedApps.contains(selectedApp) else { return }
-        appPaths.removeAll { $0 == selectedApp }; self.selectedApp = nil
+    var removableSelectedApps: Set<String> {
+        selectedApps.intersection(appPaths).subtracting(Self.fixedApps)
+    }
+
+    func removeApps() {
+        guard !closed, !busy else { return }
+        let removed = removableSelectedApps
+        appPaths.removeAll { removed.contains($0) }
+        selectedApps.removeAll()
     }
 
     func addVideos(_ urls: [URL]) {
@@ -263,25 +269,25 @@ private struct SettingsControlStyle: ViewModifier {
     }
 
     private var appList: some View {
-        ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(model.appPaths, id: \.self) { path in
-                    Button { model.selectedApp = path } label: {
-                        HStack(spacing: 10) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: path))
-                                .resizable().frame(width: 24, height: 24)
-                            Text(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent).lineLimit(1)
-                            Spacer()
-                            if HarmonySettingsModel.fixedApps.contains(path) {
-                                Text("Always allowed").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }.padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(model.selectedApp == path ? Color.accentColor.opacity(0.15) : .clear))
-                            .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
-                }
-            }.padding(6)
+        List(selection: $model.selectedApps) {
+            ForEach(model.appPaths, id: \.self) { path in
+                HStack(spacing: 10) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                        .resizable().frame(width: 24, height: 24)
+                    Text(URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent).lineLimit(1)
+                    Spacer()
+                    if HarmonySettingsModel.fixedApps.contains(path) {
+                        Text("Always allowed").font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.vertical, 5)
+                    .contentShape(Rectangle())
+                    .tag(path)
+                    .listRowSeparator(.hidden)
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .onDeleteCommand(perform: model.removeApps)
     }
 
     private var videoList: some View {
@@ -342,8 +348,8 @@ private struct SettingsControlStyle: ViewModifier {
         HStack(spacing: 8) {
             if selection == .apps {
                 Button("Add apps", action: model.chooseApps)
-                Button("Remove", action: model.removeApp)
-                    .disabled(model.selectedApp == nil || HarmonySettingsModel.fixedApps.contains(model.selectedApp ?? ""))
+                Button("Remove apps", action: model.removeApps)
+                    .disabled(model.removableSelectedApps.isEmpty)
             } else {
                 Button("Add videos", action: model.chooseVideos)
                 Button("Remove", action: model.removeVideo).disabled(model.selectedVideo == nil)

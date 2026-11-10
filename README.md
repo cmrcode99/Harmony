@@ -24,6 +24,8 @@ Choose **Allowed apps** or **Allowed videos** below **Move window** in the eye m
 
 Videos are copied into Harmony's local library. Removing one deletes only that copy; your original file stays put. Changes persist through updates. Settings pause untimed focus while open, and remain locked during timed sessions.
 
+To remove allowed apps, select a row, or Command-click/Shift-click several rows, then click **Remove apps** and **Save changes**. This changes the allowlist; it does not delete the apps from your Mac. Finder and System Settings always stay allowed.
+
 ## Set up yourself
 
 | | Requirements |

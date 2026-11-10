@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — 1.7.2
+## Unreleased — 1.7.3
+
+- Fixed selection in Allowed apps. Select one app, or Command-click/Shift-click several, then choose Remove apps. Changes take effect when saved; application files are not deleted.
+
+## 1.7.2
 
 Production cleanup for the first public beta. This section describes development changes; it is not a stable-release announcement.
 
