@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## Unreleased — 1.7.0
 
 Production cleanup for the first public beta. This section describes development changes; it is not a stable-release announcement.
 
 ### Changed
+
+- Added native drag-and-drop settings for allowed apps and user video playlists, with no rebuild required.
 
 - Added a shared agent-led setup guide and `harmony setup phone` for optional phone configuration.
 

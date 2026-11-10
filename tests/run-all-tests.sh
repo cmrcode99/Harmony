@@ -6,7 +6,7 @@ app_sources=(./*.swift)
 ./tests/run-window-preparation-tests.sh
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
-swiftc -O -whole-module-optimization -target "$(uname -m)-apple-macosx13.0" Setup.swift LifecycleCore.swift PhoneBridge.swift tests/PhoneBridgeCryptoTests.swift -o "$TEST_DIR/phone-tests" -framework Cocoa -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
+swiftc -O -whole-module-optimization -target "$(uname -m)-apple-macosx13.0" SettingsWindow.swift VideoLibrary.swift Setup.swift LifecycleCore.swift PhoneBridge.swift tests/PhoneBridgeCryptoTests.swift -o "$TEST_DIR/phone-tests" -framework Cocoa -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
 "$TEST_DIR/phone-tests"
 swiftc -O tests/PlayerTests.swift -parse-as-library -o "$TEST_DIR/player-tests" -framework JavaScriptCore
 "$TEST_DIR/player-tests"

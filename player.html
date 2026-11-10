@@ -68,7 +68,7 @@ function showUnavailable(message) {
 }
 function loadTrack(index, notify = true) {
   if (playlist.length === 0) {
-    showUnavailable('No videos are configured. Add a local MP4 and rebuild Harmony.');
+    showUnavailable('No videos yet. Add your own in Apps and videos from the Harmony menu.');
     return;
   }
   trackIndex = Number.isInteger(index) && index >= 0 && index < playlist.length ? index : 0;

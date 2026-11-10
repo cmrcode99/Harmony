@@ -16,6 +16,7 @@ extension App {
         add(menu, "Medium", #selector(medium))
         add(menu, "Large", #selector(large))
         add(menu, "Reload video", #selector(reload))
+        settingsItem = add(menu, "Apps and videos…", #selector(openSettings))
         menu.addItem(.separator())
         add(menu, "Enter phone passcode…", #selector(phoneEntry))
         lockItem = add(menu, "Start 1-hour lock", #selector(startLock))
@@ -48,6 +49,9 @@ extension App {
         applicationItem.submenu = applicationMenu
         let about = NSMenuItem(title: "About Harmony", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         applicationMenu.addItem(about)
+        let settings = add(applicationMenu, "Apps and videos…", #selector(openSettings), ",")
+        settings.isEnabled = uiReady && !isLocked
+        applicationSettingsItem = settings
         applicationMenu.addItem(.separator())
         let hide = add(applicationMenu, "Hide Harmony", #selector(hideFromApplicationMenu), "h")
         hide.isEnabled = uiReady

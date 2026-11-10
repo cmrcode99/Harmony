@@ -46,9 +46,7 @@ jobs:
         env:
           HARMONY_ARCH: ${{ matrix.arch }}
         run: |
-          # A disposable resource exercises bundling. This is not playback coverage
-          # and is never uploaded or published as a release.
-          printf 'CI resource fixture\n' > video.mp4
+          # Users can add videos in the GUI after installing this empty-media build.
           ./build.sh --stage-only "$RUNNER_TEMP/Harmony.app"
           test "$(lipo -archs "$RUNNER_TEMP/Harmony.app/Contents/MacOS/HarmonyFocus")" = "$HARMONY_ARCH"
           codesign --verify --deep --strict "$RUNNER_TEMP/Harmony.app"

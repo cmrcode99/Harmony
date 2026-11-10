@@ -133,25 +133,12 @@ enum PrivateSettingsStore {
             notice("Finish the previous session first", "The earlier Harmony version has an unfinished timed session. Exit it using its eye menu and password, or wait until its timer expires, before setting up this version.")
             return nil
         }
-        guard notice("Set up Harmony", "Harmony shows a floating video and force-quits unapproved apps while enabled. Save your work before starting it. You choose which apps stay available.\n\nEach person gets their own 50-character exit password. Save it in a password manager or another accessible place.", buttons: ["Continue", "Cancel"]) == 0 else { return nil }
-        let installed = defaultPaths.filter { FileManager.default.fileExists(atPath: $0) }
-        let names = installed.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent }.joined(separator: ", ")
-        let choice = notice("Allowed apps", "Suggested installed apps: \(names).\n\nFinder and System Settings always remain available. cmux stays unminimized when allowed.", buttons: ["Use these apps", "Choose apps…", "Cancel"])
-        var paths = installed
-        if choice == 1 {
-            let panel = NSOpenPanel()
-            panel.message = "Select every app you want available during focus mode."
-            panel.prompt = "Allow selected apps"
-            panel.directoryURL = URL(fileURLWithPath: "/Applications")
-            panel.allowedContentTypes = [.applicationBundle]
-            panel.allowsMultipleSelection = true
-            panel.canChooseFiles = true; panel.canChooseDirectories = false
-            guard panel.runModal() == .OK else { return nil }
-            paths = panel.urls.map(\.path)
-        } else if choice != 0 { return nil }
-        paths = Array(Set(paths + ["/System/Library/CoreServices/Finder.app", "/System/Applications/System Settings.app"])).sorted()
+        let paths = Array(Set(defaultPaths.filter { FileManager.default.fileExists(atPath: $0) } + HarmonySettingsModel.fixedApps)).sorted()
         let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*+-=?")
         let password = String((0..<50).map { _ in alphabet.randomElement()! })
+        let initial = AppConfiguration(unlockDigest: digest(password), approvedPaths: paths,
+                                       approvedBundleIDs: Set(paths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
+        guard let edited = HarmonySettingsWindow(configuration: initial, firstRun: true).run() else { return nil }
         while true {
             let alert = NSAlert()
             alert.messageText = "Save your Harmony password"
@@ -164,8 +151,7 @@ enum PrivateSettingsStore {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(password, forType: .string)
             case .alertSecondButtonReturn:
-                let config = AppConfiguration(unlockDigest: digest(password), approvedPaths: paths,
-                                                 approvedBundleIDs: Set(paths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
+                let config = edited
                 do {
                     try PrivateSettingsStore.write(JSONEncoder().encode(config.validated()), to: configurationURL)
                     notice("Setup saved", "Start Harmony again when you are ready. In System Settings, allow Harmony to control apps so window minimization works. Screen Recording is needed only for the optional phone helper.")

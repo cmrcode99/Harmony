@@ -15,19 +15,21 @@ Choose the route matching the folder you received:
 | Folder contains | What to do |
 | --- | --- |
 | `Harmony.app` and `Install Harmony.command` | Run the installer. No compiler or Python is needed. |
-| `setup.sh` and Swift source files | Use an MP4 the user chooses. Run `./setup.sh --check --video /absolute/path/to/video.mp4`, resolve reported prerequisites, then run `./setup.sh --video /absolute/path/to/video.mp4`. Existing playlist media also works with `./setup.sh`. |
+| `setup.sh` and Swift source files | Run `./setup.sh --check`, resolve reported prerequisites, then run `./setup.sh`. The user can add videos in the setup window or later; a video file is not required to install. |
 
 If Harmony is already running, finish its session before updating. Installation keeps existing settings and does not start focus mode. Use `~/.local/bin/harmony` directly; editing the user's shell configuration is unnecessary.
 
 ### 2. Help the user finish the setup window
 
-Ask which apps they want available during focus time, including their agent and terminal. The user chooses the allowed apps and saves their generated **Harmony recovery password** privately. Never request that password in chat.
+Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Your videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.
 
 Explain: “Harmony closes apps outside your allowed list during focus sessions. Save work before starting.”
 
 Help the user enable Harmony under **System Settings → Privacy & Security → Accessibility**. The user grants the permission. If macOS blocks the downloaded app, explain its approval prompt; do not disable system security.
 
 Verify `~/.local/bin/harmony help`. When the user is ready to try focus mode, use `~/.local/bin/harmony`; exit an untimed session with `~/.local/bin/harmony exit`. Timed early exit uses the eye menu and recovery password. Do not start a timed test as part of installation.
+
+For later changes, open **Apps and videos…** in Harmony, or use `harmony setup` while it is off. Untimed focus pauses while settings are open. Timed sessions must finish first. There is no need to edit JSON for normal app or video changes.
 
 ### 3. Offer the phone helper, with “skip for now” as a complete outcome
 

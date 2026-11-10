@@ -16,6 +16,14 @@ Give your agent this repository or the downloaded Harmony folder and say:
 
 Your agent handles installation and verification. You choose your allowed apps, save your recovery password, and approve macOS permissions. Enter passwords in the app's local windows, never in chat. Phone setup is optional.
 
+## Apps and videos, your way
+
+Open **Apps and videos…** from Harmony's menu (or run `harmony setup` while it is off). Drag applications from Finder into **Allowed apps**, and drop your own videos into **Your videos**. Add/remove buttons work too; the arrows change playback order. Finder and System Settings always stay allowed.
+
+<p align="center"><img src="docs/screenshots/settings.png" width="800" alt="Harmony settings with allowed applications and a video playlist"><br><em>Settings window with sample data.</em></p>
+
+Videos are copied into Harmony's local library. Removing one deletes only that copy; your original file stays put. Changes persist through updates. Settings pause untimed focus while open, and remain locked during timed sessions.
+
 ## Set up yourself
 
 | | Requirements |
@@ -29,15 +37,15 @@ From a fresh checkout:
 ```sh
 git clone https://github.com/cmrcode99/Harmony.git
 cd Harmony
-./setup.sh --check --video /path/to/your-video.mp4
-./setup.sh --video /path/to/your-video.mp4
+./setup.sh --check
+./setup.sh
 ```
 
 The first command checks requirements without changing files. The second builds and installs `~/Applications/Harmony.app` and `~/.local/bin/harmony`, then opens setup. If developer tools are missing, run `xcode-select --install`; an older SDK may need updating to meet the build requirement. [Apple lists supported build systems](https://developer.apple.com/xcode/system-requirements/).
 
 Choose the apps you want available and save the generated recovery password somewhere accessible. **Setup does not start a focus session.** Enable Harmony in **System Settings → Privacy & Security → Accessibility** for window control. Screen Recording is needed only for the phone helper.
 
-Use an MP4 your Mac can play. Videos stay local and are excluded from Git; bring media you have permission to use. For several videos, edit `media/playlist.json` and run `./setup.sh`. Missing files are skipped, but at least one video is required. `--video` adds your supplied video with no intro trim.
+Add MP4, M4V, or MOV videos in the settings window, during setup or later. Videos stay local. No video file is required to build or install. Developers can still bundle a playlist through `media/playlist.json` or pass `--video /path/to/video.mp4` to setup.
 
 If you received a prebuilt package, unzip it and run **Install Harmony.command**. It needs no developer tools or Python. Current local builds are signed but not Apple-notarized, so macOS may require approval in Privacy & Security.
 

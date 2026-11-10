@@ -39,6 +39,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var lockItem: NSMenuItem!
     var quitItem: NSMenuItem!
     var applicationQuitItem: NSMenuItem?
+    var settingsItem: NSMenuItem?
+    var applicationSettingsItem: NSMenuItem?
+    var settingsOpen = false
     var focusEnabled = true
     private var suspensions = FocusSuspensions()
     var interactionsSuspended: Bool { suspensions.isSuspended }
@@ -104,7 +107,13 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             exit(0)
         }
         // First-run setup is never also consent to force-quit running apps.
-        if !existed || CommandLine.arguments.contains("--configure-only") { exit(0) }
+        if CommandLine.arguments.contains("--configure-only"), existed {
+            _ = HarmonySettingsWindow(configuration: configuration, onSave: { edited in
+                try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
+            }).run()
+            exit(0)
+        }
+        if !existed { exit(0) }
 #endif
         createOverlay()
         installStatusMenu()
@@ -182,6 +191,31 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             beginLock(hours: command.hours!, minutes: command.minutes, prepareApps: false)
         }
     }
+    @objc func openSettings() {
+        guard !settingsOpen, !isLocked, !unlockPromptOpen, !phoneBridge.isBusy, let current = configuration else { return }
+        settingsOpen = true
+        let enabled = focusEnabled
+        let visible = panel.isVisible
+        focusEnabled = false
+        windowPreparation.cancel()
+        panel.orderOut(nil)
+        updatePlayer()
+        defer {
+            settingsOpen = false
+            focusEnabled = enabled
+            if visible { panel.orderFrontRegardless() }
+            updatePlayer()
+        }
+        if let edited = HarmonySettingsWindow(configuration: current, sessionPaused: enabled, onSave: { edited in
+            try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
+        }).run() {
+            configuration = edited
+            configuredAllowedIDs = edited.approvedIDs
+            playlistIndex = 0
+            reload()
+        }
+    }
+
     func launchApprovedApps() {
         guard focusEnabled else { return }
         let generation = windowPreparation.begin()
@@ -280,6 +314,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         }
     }
     @objc func phoneEntry() {
+        guard !settingsOpen else { return }
         guard focusEnabled else { NSSound.beep(); return }
         if unlockPromptOpen { exitPrompt.activate(); return }
         if phoneBridge.isBusy { phoneBridge.activatePrompt(); return }
@@ -289,6 +324,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         phoneBridge.run()
     }
     func showEye(prepareApps: Bool = true) {
+        guard !settingsOpen else { return }
         guard uiReady else { pendingShow = true; return }
         if phoneBridge.isBusy { phoneBridge.activatePrompt(); return }
         if unlockPromptOpen {
@@ -333,6 +369,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     }
     @objc func startLock() { beginLock(hours: 1) }
     func beginLock(hours: Int, minutes: Int = 0, prepareApps: Bool = true) {
+        guard !settingsOpen else { return }
         guard let duration = HarmonyDuration(hours: hours, minutes: minutes), !isLocked,
               !phoneBridge.isBusy, !unlockPromptOpen else { return }
         let seconds = duration.seconds
@@ -393,10 +430,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     }
     func tickLock() {
         let locked = isLocked
+        settingsItem?.isEnabled = !settingsOpen && !locked && !unlockPromptOpen && !phoneBridge.isBusy
+        applicationSettingsItem?.isEnabled = settingsItem?.isEnabled ?? false
         if applicationQuitItem?.isEnabled == locked { applicationQuitItem?.isEnabled = !locked }
         let quitTitle = locked ? "Quit Harmony Focus…" : "Quit Harmony"
         if quitItem.title != quitTitle { quitItem.title = quitTitle }
-        if lockItem.isEnabled != !locked { lockItem.isEnabled = !locked }
+        if lockItem.isEnabled != (!locked && !settingsOpen) { lockItem.isEnabled = !locked && !settingsOpen }
         let lockTitle = locked ? "Locked — \(formatTime(ceil(lockRemaining))) remaining" + (recoveryAvailable ? "" : " (recovery unavailable)") : "Start 1-hour lock"
         if lockItem.title != lockTitle { lockItem.title = lockTitle }
         if !locked && lockWallEnd > 0 {
