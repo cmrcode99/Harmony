@@ -36,6 +36,7 @@ if (( ${sdk_version%%.*} < 26 )); then
 fi
 if [[ -n "$video" ]]; then
   [[ -s "$video" ]] || { print -u2 'The selected video is empty.'; exit 1; }
+  python3 tools/copy-player-resources.py --check --video "$video"
 else
   python3 tools/copy-player-resources.py --check
 fi

@@ -17,6 +17,8 @@ class SetupTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         shutil.copy2(ROOT / 'setup.sh', self.root / 'setup.sh')
         (self.root / 'media').mkdir()
+        (self.root / 'tools').mkdir()
+        shutil.copy2(ROOT / 'tools/copy-player-resources.py', self.root / 'tools/copy-player-resources.py')
         self.playlist = self.root / 'media/playlist.json'
         self.original = json.dumps([{'file': 'video.mp4', 'title': 'Focus', 'startSeconds': 120}])
         self.playlist.write_text(self.original)
@@ -58,6 +60,18 @@ class SetupTests(unittest.TestCase):
         result = self.setup('--video', self.video, '--no-open')
         self.assertNotEqual(result.returncode, 0)
         self.assert_unmodified()
+
+    def test_invalid_effective_playlist_fails_before_media_changes(self):
+        for malformed in ['[]', '{', json.dumps([
+                {'file': 'video.mp4', 'title': 'Focus'},
+                {'file': '../outside.mp4', 'title': 'Invalid'}])]:
+            with self.subTest(playlist=malformed):
+                self.original = malformed
+                self.playlist.write_text(malformed)
+                for mode in ['--check', '--no-open']:
+                    result = self.setup('--video', self.video, mode)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assert_unmodified()
 
     def test_valid_setup_updates_custom_media_after_preflight(self):
         result = self.setup('--video', self.video, '--no-open')

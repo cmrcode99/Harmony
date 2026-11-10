@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate a local playlist and bundle the files that are available."""
+import argparse
 import json
 import math
 from pathlib import Path
@@ -8,15 +9,19 @@ import stat
 import sys
 
 
-def available_playlist(root: Path) -> list:
+def available_playlist(root: Path, video_override: Path = None) -> list:
     root = root.resolve()
     playlist = json.loads((root / 'media/playlist.json').read_text())
     if not isinstance(playlist, list) or not playlist:
         raise ValueError('The video playlist is empty or invalid.')
+    if video_override is not None:
+        if not isinstance(playlist[0], dict):
+            raise ValueError('Each playlist entry must describe a video.')
+        playlist[0] = {**playlist[0], 'file': 'video.mp4', 'title': 'My focus video', 'startSeconds': 0}
     if len(playlist) > 1024:
         raise ValueError('The video playlist supports at most 1024 entries.')
     files, identities, available = set(), set(), []
-    for entry in playlist:
+    for index, entry in enumerate(playlist):
         if not isinstance(entry, dict):
             raise ValueError('Each playlist entry must describe a video.')
         name = entry.get('file')
@@ -38,7 +43,7 @@ def available_playlist(root: Path) -> list:
         if not valid_start:
             raise ValueError('Video start times must be finite, nonnegative seconds.')
         try:
-            metadata = source.stat()
+            metadata = (video_override if index == 0 and video_override is not None else source).stat()
         except FileNotFoundError:
             continue
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_size == 0:
@@ -66,12 +71,18 @@ def copy_resources(destination: Path, root: Path = None) -> None:
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise SystemExit('Usage: copy-player-resources.py DESTINATION | --check')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('destination', nargs='?', type=Path)
+    parser.add_argument('--check', action='store_true')
+    parser.add_argument('--video', type=Path, help='Check an effective first-video replacement without writing it.')
+    args = parser.parse_args()
+    if args.check == (args.destination is not None) or (args.video is not None and not args.check):
+        parser.error('Use DESTINATION, or --check [--video FILE].')
     try:
-        if sys.argv[1] == '--check':
-            print(f'{len(available_playlist(Path(__file__).resolve().parents[1]))} local video(s) available.')
+        if args.check:
+            root = Path(__file__).resolve().parents[1]
+            print(f'{len(available_playlist(root, video_override=args.video))} local video(s) available.')
         else:
-            copy_resources(Path(sys.argv[1]))
+            copy_resources(args.destination)
     except (ValueError, OSError) as error:
         raise SystemExit(str(error))
