@@ -140,7 +140,7 @@ def write_archive(root: Path, destination: Path, epoch: int = 315532800) -> Path
                     info.external_attr |= 0x10
                     output.writestr(info, b'')
                 else:
-                    with path.open('rb') as source, output.open(info, 'w') as target:
+                    with path.open('rb') as source, output.open(info, 'w', force_zip64=True) as target:
                         for chunk in iter(lambda: source.read(1024 * 1024), b''):
                             target.write(chunk)
         digest = hashlib.sha256()

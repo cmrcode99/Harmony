@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,16 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(archive.namelist(), ['Harmony/', 'Harmony/Install.command', 'Harmony/readme.txt'])
             self.assertEqual(archive.getinfo('Harmony/Install.command').external_attr >> 16 & 0o777, 0o755)
             self.assertEqual(archive.getinfo('Harmony/readme.txt').date_time, (1980, 1, 1, 0, 0, 0))
+
+    def test_large_video_archive_uses_zip64(self):
+        content = b'video fixture' * 64
+        (self.package / 'large.mp4').write_bytes(content)
+        destination = self.root / 'large.zip'
+        # Exercise the large-entry path without allocating a multi-gigabyte file.
+        with patch.object(zipfile, 'ZIP64_LIMIT', 128):
+            release.write_archive(self.package, destination)
+        with zipfile.ZipFile(destination) as archive:
+            self.assertEqual(archive.read('Harmony/large.mp4'), content)
 
     def test_archive_refuses_overwrite_and_output_inside_package(self):
         destination = self.root / 'release.zip'
