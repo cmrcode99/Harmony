@@ -1,0 +1,20 @@
+HARMONY
+
+1. Run Install Harmony.command to install the app and terminal command.
+2. Choose your allowed apps and save your generated recovery password.
+3. Enable Harmony under System Settings > Privacy & Security > Accessibility.
+4. When ready, open Harmony or run ~/.local/bin/harmony.
+
+Focus mode force-quits apps outside your chosen list. Save work first.
+Setup itself does not start focus mode. Timed early exit uses the eye menu
+and your recovery password. Run ~/.local/bin/harmony help for commands.
+
+For the optional iPhone helper, configure Screen Time and iPhone Mirroring,
+then run Setup iPhone.command while Harmony is off. Enter your existing
+Screen Time code. Screen Recording permission is required for this helper.
+
+This is a locally signed app, not Apple-notarized. macOS may require you to
+allow it in Privacy & Security. No administrator password is needed by the
+installer. The package supports the Mac architecture shown in its ZIP name.
+
+If an agent is helping you, give it AGENT_SETUP.md.

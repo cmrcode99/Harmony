@@ -1,0 +1,244 @@
+import Cocoa
+
+private final class MenuActionProbe: NSObject {
+    var calls = 0
+    @objc func fire() { calls += 1 }
+}
+
+/// Exercise the production menu/controller code without launching focus mode,
+/// opening windows, requesting permissions, or touching the live app's domain.
+struct AppIntegrationTests {
+    @MainActor static func main() {
+        if CommandLine.arguments.contains("--ui-smoke") {
+            runUISmoke()
+            return
+        }
+        let application = NSApplication.shared
+        application.setActivationPolicy(.prohibited)
+        let controller = App()
+        controller.lockWallEnd = 0
+        controller.focusEnabled = false
+        controller.installApplicationMenu()
+        let setupMenu = application.mainMenu!.items[0].submenu!
+        precondition(setupMenu.items.first(where: { $0.keyEquivalent == "h" })?.isEnabled == false,
+                     "Setup exposed Hide before the video panel exists")
+        precondition(application.mainMenu?.item(withTitle: "Focus") == nil,
+                     "Setup exposed controls before initialization")
+        precondition(setupMenu.items.contains(where: { $0.keyEquivalent == "q" }), "Setup has no normal Quit")
+
+        let item = NSStatusBar.system.statusItem(withLength: 0)
+        item.isVisible = false
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        controller.status = item
+        let statusMenu = NSMenu()
+        statusMenu.autoenablesItems = false
+        controller.lockItem = controller.add(statusMenu, "Start 1-hour lock", #selector(App.startLock))
+        controller.quitItem = controller.add(statusMenu, "Quit Harmony", #selector(App.exitFromEye))
+        item.menu = statusMenu
+        controller.statusMenu = statusMenu
+        controller.uiReady = true
+        controller.installApplicationMenu()
+        let focusMenu = application.mainMenu!.item(withTitle: "Focus")!.submenu!
+        let normalQuit = application.mainMenu!.items[0].submenu!.items.first(where: { $0.keyEquivalent == "q" })!
+
+        controller.lockWallEnd = Date().timeIntervalSince1970 + 3600
+        controller.menuNeedsUpdate(focusMenu)
+        precondition(!normalQuit.isEnabled, "Ordinary Quit bypassed a timed session")
+        let copiedQuit = focusMenu.items.last!
+        precondition(!copiedQuit.isEnabled && copiedQuit.action == #selector(App.quit),
+                     "App menu acquired the eye-only password-exit action")
+        precondition(controller.quitItem.isEnabled && controller.quitItem.action == #selector(App.exitFromEye),
+                     "Eye-menu password exit was disabled or replaced")
+        precondition(item.menu === statusMenu && statusMenu.items.count == 2,
+                     "Opening the app menu stole the status menu's items")
+        precondition(copiedQuit !== controller.quitItem, "Menus share an owned menu item")
+
+        controller.lockWallEnd = 0
+        controller.menuNeedsUpdate(focusMenu)
+        precondition(normalQuit.isEnabled && focusMenu.items.last!.isEnabled,
+                     "Ordinary Quit did not return after the timed session")
+        let probe = MenuActionProbe()
+        let action = NSMenuItem(title: "Probe", action: #selector(MenuActionProbe.fire), keyEquivalent: "")
+        action.target = probe
+        action.isEnabled = false
+        statusMenu.addItem(action)
+        controller.performStatusMenuItem(2)
+        controller.performStatusMenuItem(-1)
+        controller.performStatusMenuItem(100)
+        precondition(probe.calls == 0, "Modern menu dispatched a disabled or stale action")
+        action.isEnabled = true
+        controller.performStatusMenuItem(2)
+        precondition(probe.calls == 1, "Modern menu failed to dispatch the original command target")
+
+        let snapshot = HarmonyStatusMenuState()
+        var publications = 0
+        let subscription = snapshot.$entries.dropFirst().sink { _ in publications += 1 }
+        snapshot.update(from: statusMenu)
+        snapshot.update(from: statusMenu)
+        precondition(publications == 1, "Unchanged timer ticks republished the whole status menu")
+        action.identifier = NSUserInterfaceItemIdentifier("mute")
+        action.state = .on
+        snapshot.update(from: statusMenu)
+        precondition(snapshot.entries[2].toggle && snapshot.entries[2].checked,
+                     "Modern menu lost the native mute checkmark")
+        withExtendedLifetime(subscription) {}
+        print("PASS production menus: setup readiness, native app controls, eye-only timed exit, independent menu ownership")
+        print("PASS modern status menu: original command dispatch, disabled/stale action rejection, change-only snapshots, toggle state")
+        testTimerExtension(controller)
+    }
+
+    @MainActor private static func testTimerExtension(_ controller: App) {
+        // Reuse the production helper guard so these tests never kickstart the
+        // real user's recovery job. Production startup is excluded in this build.
+        precondition(CommandLine.arguments.contains("--supervised"))
+        precondition(Bundle.main.bundleIdentifier != "local.harmony.focus")
+        let defaults = UserDefaults.standard
+        let savedDeadline = defaults.object(forKey: "lockEnd")
+        defer {
+            if let saved = savedDeadline { defaults.set(saved, forKey: "lockEnd") }
+            else { defaults.removeObject(forKey: "lockEnd") }
+            defaults.synchronize()
+        }
+        controller.panel = FloatingPanel(contentRect: NSRect(x: 20, y: 100, width: 320, height: 180),
+                                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        controller.panel.isReleasedWhenClosed = false
+        controller.focusEnabled = true
+        controller.lockWallEnd = Date().timeIntervalSince1970 + 7200
+        controller.lockUptimeEnd = ProcessInfo.processInfo.systemUptime + 7200
+        controller.volume = 42
+        controller.muted = false
+        let frame = controller.panel.frame
+        let generation = controller.windowPreparation.generation
+        let oldWall = controller.lockWallEnd
+        let oldUptime = controller.lockUptimeEnd!
+        let result = controller.extendLock(hours: 4, minutes: 30)
+        precondition(result.rejection == nil && result.message?.contains("remaining") == true)
+        precondition(result.message?.contains("4:30:00 remaining") == true, "CLI result did not report the requested target")
+        precondition(abs(controller.lockWallEnd - oldWall - 9000) < 0.2)
+        precondition(abs(controller.lockUptimeEnd! - oldUptime - 9000) < 0.2)
+        precondition(defaults.double(forKey: "lockEnd") == controller.lockWallEnd, "Accepted extension was not persisted")
+        precondition(controller.focusEnabled && !controller.panel.isVisible && controller.panel.frame == frame,
+                     "Extension changed focus or revealed/moved the hidden eye")
+        precondition(controller.volume == 42 && !controller.muted && controller.windowPreparation.generation == generation,
+                     "Extension reset sound or repeated app preparation")
+
+        func notify(_ hours: Int, minutes: Int = 0, id: String?) {
+            var info: [String: Any] = ["action": "extend", "hours": hours]
+            if minutes != 0 { info["minutes"] = minutes }
+            if let id = id { info["requestID"] = id }
+            controller.externalToggle(Notification(name: HarmonyCommandChannel.commandName, userInfo: info))
+        }
+        let id = UUID().uuidString
+        notify(4, minutes: 45, id: id)
+        let once = controller.lockWallEnd
+        notify(4, minutes: 45, id: id)
+        precondition(controller.lockWallEnd == once, "A retried request extended twice")
+        notify(5, id: nil)
+        notify(5, id: "")
+        notify(6, id: UUID().uuidString)
+        notify(5, minutes: 1, id: UUID().uuidString)
+        notify(4, minutes: 60, id: UUID().uuidString)
+        controller.externalToggle(Notification(name: HarmonyCommandChannel.commandName,
+            userInfo: ["action": "extend", "hours": 5, "minutes": "bad", "requestID": UUID().uuidString]))
+        precondition(controller.lockWallEnd == once, "Unidentified or malformed command changed the deadline")
+        controller.unlockPromptOpen = true
+        notify(5, id: UUID().uuidString)
+        precondition(controller.lockWallEnd == once, "Extension changed an open password prompt's session")
+        controller.unlockPromptOpen = false
+        let shorter = controller.extendLock(hours: 4)
+        precondition(shorter.rejection?.contains("shorten") == true && controller.lockWallEnd == once,
+                     "Smaller extension target shortened the timer")
+        let maximum = controller.extendLock(hours: 5)
+        precondition(maximum.message?.contains("5:00:00 remaining") == true)
+        precondition(controller.lockRemaining <= 18_000 && controller.lockRemaining > 17_999,
+                     "Extension did not enforce the five-hour remaining cap")
+        controller.lockWallEnd = 0
+        controller.lockUptimeEnd = nil
+        controller.focusEnabled = false
+        notify(5, id: id) // A late retry keeps its original receipt without reviving the session.
+        notify(5, id: UUID().uuidString)
+        precondition(controller.lockWallEnd == 0 && !controller.focusEnabled,
+                     "Extension revived an expired session")
+        controller.panel.close()
+        print("PASS production extension: persisted clocks, unchanged UI/audio/preparation, exactly-once retries, busy/expired rejection, cap")
+    }
+
+    /// A real event-loop check complements controller tests: it catches scene
+    /// update loops and failed WebKit startup that a typecheck cannot detect.
+    @MainActor private static func runUISmoke() {
+        let application = NSApplication.shared
+        let controller = App()
+        controller.focusEnabled = false
+        controller.lockWallEnd = 0
+        let minuteTimer = CommandLine.arguments.contains("--minute-timer")
+        if minuteTimer { controller.initialCommand = HarmonyCommand(action: "lock", hours: 0, minutes: 1) }
+        application.delegate = controller
+        var samples = 0
+        var successes = 0
+        var checkingPlaylist = false
+        let timer = Timer(timeInterval: 0.5, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                guard !checkingPlaylist else { return }
+                samples += 1
+                if samples > 16 { fputs("UI startup did not become ready.\n", stderr); exit(1) }
+                guard controller.uiReady else { return }
+                controller.web.evaluateJavaScript("(() => { const v=document.querySelector('video'); const s=window.harmonyPlaybackSnapshot?.(); return !!s && s[1]>0 && v.muted && !v.paused; })()") { value, error in
+                    if error == nil, value as? Bool == true { successes += 1 }
+                    if successes >= 3 {
+                        if minuteTimer {
+                            guard controller.isLocked, !controller.focusEnabled,
+                                  controller.lockRemaining <= 60, controller.lockRemaining > 30 else {
+                                fputs("Minute-duration startup did not initialize the expected deadline.\n", stderr)
+                                exit(1)
+                            }
+                            print("PASS live minute startup: one-minute deadline, enforcement disabled, recovery helper suppressed")
+                        }
+                        print("PASS live UI startup: responsive event loop, system status scene, local video metadata, muted playback")
+                        if CommandLine.arguments.contains("--playlist-smoke") {
+                            checkingPlaylist = true
+                            Task { @MainActor in
+                                do { try await checkPlaylist(controller); exit(0) }
+                                catch { fputs("Playlist smoke test failed: \(error)\n", stderr); exit(1) }
+                            }
+                        } else { exit(0) }
+                    }
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        application.run()
+    }
+    @MainActor private static func checkPlaylist(_ controller: App) async throws {
+        let deadline = controller.lockWallEnd
+        let focusEnabled = controller.focusEnabled
+        _ = try await controller.web.evaluateJavaScript("(() => { document.querySelector('video').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'})); return true; })()")
+        let container = controller.panel.contentView as! HoverView
+        container.showControls(true)
+        controller.resize(160)
+        container.layoutSubtreeIfNeeded()
+        precondition(!controller.skipButton.isHiddenOrHasHiddenAncestor && controller.skipButton.frame.width >= 24,
+                     "Skip is inaccessible at the smallest window size")
+        for expected in [1, 2, 3, 0] {
+            controller.volume = 37
+            controller.muted = expected == 1 || expected == 2
+            controller.updatePlayer()
+            controller.skipButton.performClick(nil)
+            var loaded = false
+            for _ in 0..<40 {
+                let state = try await controller.web.evaluateJavaScript("(() => { const v=document.querySelector('video'); const s=window.harmonyPlaybackSnapshot?.(); return s ? [s[2],s[1],v.paused?1:0,v.muted?1:0,v.volume,v.currentTime,s[0]] : null; })()")
+                if let values = state as? [Double], values.count == 7, values[0] == Double(expected), values[1] > 0 {
+                    precondition(values[2] == 1 && values[3] == (controller.muted ? 1 : 0) && abs(values[4] - 0.37) < 0.001,
+                                 "Skip changed pause, mute or volume")
+                    precondition(abs(values[5] - 120) < 0.1 && abs(values[6]) < 0.1,
+                                 "A video did not start at its two-minute trim point")
+                    loaded = true; break
+                }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            precondition(loaded, "Playlist file did not load through the actual native Skip button")
+            precondition(controller.lockWallEnd == deadline && controller.focusEnabled == focusEnabled,
+                         "Skip changed the focus session or timer")
+        }
+        print("PASS live playlist: hover Skip at minimum size, all four actual files start at 2:00 with relative timeline, wraparound, pause/mute/volume and unchanged focus/deadline")
+    }
+}
