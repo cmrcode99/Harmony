@@ -55,6 +55,17 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertEqual(calls, [])
 
+    def test_settings_shortcuts_open_matching_finder_section(self):
+        self.env['TEST_RUNNING'] = '0'
+        for section in ['apps', 'videos']:
+            result, calls = self.run_cli('setup', section)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(calls, [[str(self.root / 'Applications/Harmony.app'), '--args', '--configure-only', '--settings-' + section]])
+        self.env['TEST_RUNNING'] = '1'
+        result, calls = self.run_cli('setup', 'apps')
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(calls, [])
+
     def test_packaged_phone_shortcut_uses_the_same_command(self):
         shortcut = SOURCE.parents[1] / 'sharing/Setup iPhone.command'
         result = subprocess.run(['zsh', str(shortcut)], env=self.env, capture_output=True, text=True)

@@ -40,6 +40,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var quitItem: NSMenuItem!
     var applicationQuitItem: NSMenuItem?
     var settingsItem: NSMenuItem?
+    var videoSettingsItem: NSMenuItem?
     var applicationSettingsItem: NSMenuItem?
     var settingsOpen = false
     var focusEnabled = true
@@ -108,7 +109,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         }
         // First-run setup is never also consent to force-quit running apps.
         if CommandLine.arguments.contains("--configure-only"), existed {
-            _ = HarmonySettingsWindow(configuration: configuration, onSave: { edited in
+            _ = HarmonySettingsWindow(configuration: configuration, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil, onSave: { edited in
                 try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
             }).run()
             exit(0)
@@ -191,7 +192,11 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             beginLock(hours: command.hours!, minutes: command.minutes, prepareApps: false)
         }
     }
-    @objc func openSettings() {
+    @objc func openSettings() { presentSettings() }
+    @objc func openAllowedApps() { presentSettings(section: .apps) }
+    @objc func openAllowedVideos() { presentSettings(section: .videos) }
+
+    private func presentSettings(section: SettingsSection? = nil) {
         guard !settingsOpen, !isLocked, !unlockPromptOpen, !phoneBridge.isBusy, let current = configuration else { return }
         settingsOpen = true
         let enabled = focusEnabled
@@ -206,7 +211,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             if visible { panel.orderFrontRegardless() }
             updatePlayer()
         }
-        if let edited = HarmonySettingsWindow(configuration: current, sessionPaused: enabled, onSave: { edited in
+        if let edited = HarmonySettingsWindow(configuration: current, sessionPaused: enabled, section: section, revealFinder: section != nil, onSave: { edited in
             try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
         }).run() {
             configuration = edited
@@ -431,6 +436,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     func tickLock() {
         let locked = isLocked
         settingsItem?.isEnabled = !settingsOpen && !locked && !unlockPromptOpen && !phoneBridge.isBusy
+        videoSettingsItem?.isEnabled = settingsItem?.isEnabled ?? false
         applicationSettingsItem?.isEnabled = settingsItem?.isEnabled ?? false
         if applicationQuitItem?.isEnabled == locked { applicationQuitItem?.isEnabled = !locked }
         let quitTitle = locked ? "Quit Harmony Focus…" : "Quit Harmony"

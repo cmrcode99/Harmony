@@ -1,12 +1,13 @@
 #!/bin/zsh
 set -eu
 app="$HOME/Applications/Harmony.app"
-usage='Usage: harmony [HOURS [MINUTES]|hide|unhide|exit|phone|setup [phone]|uninstall|help] | harmony extend HOURS [MINUTES]'
+usage='Usage: harmony [HOURS [MINUTES]|hide|unhide|exit|phone|setup [apps|videos|phone]|uninstall|help] | harmony extend HOURS [MINUTES]'
 if (( $# > 3 )); then print -u2 "$usage"; exit 2; fi
 action=show
 hours=''
 minutes=''
 configuration_flag=--configure-only
+configuration_extra=()
 parse_duration() {
   (( $# >= 1 && $# <= 2 )) || return 1
   [[ "$1" == [0-5] ]] || return 1
@@ -43,8 +44,13 @@ case "${1-}" in
     [[ -f "$manager" ]] || { print -u2 'The uninstall helper is missing. Run uninstall.sh from the source folder or Uninstall Harmony.command from your package.'; exit 1; }
     exec /bin/zsh "$manager" uninstall "${@:2}" ;;
   setup)
-    if (( $# == 2 )) && [[ "$2" == phone ]]; then
-      configuration_flag=--configure-phone
+    if (( $# == 2 )); then
+      case "$2" in
+        phone) configuration_flag=--configure-phone ;;
+        apps) configuration_extra=(--settings-apps) ;;
+        videos) configuration_extra=(--settings-videos) ;;
+        *) print -u2 "$usage"; exit 2 ;;
+      esac
     elif (( $# != 1 )); then
       print -u2 "$usage"; exit 2
     fi
@@ -54,7 +60,7 @@ case "${1-}" in
     action="$1" ;;
   help|--help|-h)
     if (( $# != 1 )); then print -u2 "$usage"; exit 2; fi
-    print 'harmony              Start Harmony and prepare approved apps\nharmony 1..5         Start a whole-hour timed session\nharmony H M          Start H hours M minutes (e.g. 2 30 or 0 45)\nharmony extend N [M] Set an active timer to N hours M minutes remaining\nharmony hide         Hide eye and silence audio; keep restrictions/timer\nharmony unhide       Show eye again without changing the timer\nharmony phone        Verify long password and type Screen Time code\nharmony exit         Exit base mode; timed sessions exit through the eye menu\nharmony setup        Open first-run setup while off\nharmony setup phone  Set up the optional iPhone helper while off\nharmony uninstall    Remove the app and command; keep saved settings\nharmony uninstall --remove-data  Also remove saved settings and phone vault\nharmony help         Show this help (also --help or -h)\n\nMinutes must be 0–59. Total duration: 1 minute to 5 hours; 5 0 is valid, 5 1 is not. Hours alone must be 1–5. Extend uses a target from now; it does not add time, shorten, start or revive a session. Start commands refuse an already-running instance. Use unhide to reveal a hidden eye.'
+    print 'harmony              Start Harmony and prepare approved apps\nharmony 1..5         Start a whole-hour timed session\nharmony H M          Start H hours M minutes (e.g. 2 30 or 0 45)\nharmony extend N [M] Set an active timer to N hours M minutes remaining\nharmony hide         Hide eye and silence audio; keep restrictions/timer\nharmony unhide       Show eye again without changing the timer\nharmony phone        Verify long password and type Screen Time code\nharmony exit         Exit base mode; timed sessions exit through the eye menu\nharmony setup        Open first-run setup while off\nharmony setup apps   Open allowed apps and Finder\nharmony setup videos Open allowed videos and Finder\nharmony setup phone  Set up the optional iPhone helper while off\nharmony uninstall    Remove the app and command; keep saved settings\nharmony uninstall --remove-data  Also remove saved settings and phone vault\nharmony help         Show this help (also --help or -h)\n\nMinutes must be 0–59. Total duration: 1 minute to 5 hours; 5 0 is valid, 5 1 is not. Hours alone must be 1–5. Extend uses a target from now; it does not add time, shorten, start or revive a session. Start commands refuse an already-running instance. Use unhide to reveal a hidden eye.'
     exit 0 ;;
   *) print -u2 "$usage"; exit 2 ;;
 esac
@@ -69,7 +75,7 @@ if (( running_status > 1 )); then
 fi
 if [[ "$action" == setup ]]; then
   if (( running_status == 0 )); then print -u2 'Exit Harmony before changing setup.'; exit 1; fi
-  /usr/bin/open "$app" --args "$configuration_flag"
+  /usr/bin/open "$app" --args "$configuration_flag" "${configuration_extra[@]}"
   exit 0
 fi
 duration_args=("$hours")

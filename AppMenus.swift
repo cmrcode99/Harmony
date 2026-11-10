@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Native application and menu-bar controls share the same command targets.
 extension App {
-    func installStatusMenu() {
+    func makeStatusMenu() -> NSMenu {
         let menu = NSMenu(title: "Harmony focus controls")
         menu.delegate = self
         menu.autoenablesItems = false
@@ -11,17 +11,23 @@ extension App {
         muteItem = add(menu, "Unmute", #selector(sound))
         muteItem.identifier = NSUserInterfaceItemIdentifier("mute")
         moveItem = add(menu, "Move window", #selector(toggleWindowMovement))
+        settingsItem = add(menu, "Allowed apps…", #selector(openAllowedApps))
+        videoSettingsItem = add(menu, "Allowed videos…", #selector(openAllowedVideos))
         menu.addItem(.separator())
         add(menu, "Small", #selector(small))
         add(menu, "Medium", #selector(medium))
         add(menu, "Large", #selector(large))
         add(menu, "Reload video", #selector(reload))
-        settingsItem = add(menu, "Apps and videos…", #selector(openSettings))
         menu.addItem(.separator())
         add(menu, "Enter phone passcode…", #selector(phoneEntry))
         lockItem = add(menu, "Start 1-hour lock", #selector(startLock))
         menu.addItem(.separator())
         quitItem = add(menu, "Quit Harmony", #selector(exitFromEye))
+        return menu
+    }
+
+    func installStatusMenu() {
+        let menu = makeStatusMenu()
         statusMenu = menu
         if #available(macOS 26.0, *) {
             statusMenuState.perform = { [weak self] index in self?.performStatusMenuItem(index) }

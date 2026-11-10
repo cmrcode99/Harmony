@@ -138,7 +138,7 @@ enum PrivateSettingsStore {
         let password = String((0..<50).map { _ in alphabet.randomElement()! })
         let initial = AppConfiguration(unlockDigest: digest(password), approvedPaths: paths,
                                        approvedBundleIDs: Set(paths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
-        guard let edited = HarmonySettingsWindow(configuration: initial, firstRun: true).run() else { return nil }
+        guard let edited = HarmonySettingsWindow(configuration: initial, firstRun: true, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil).run() else { return nil }
         while true {
             let alert = NSAlert()
             alert.messageText = "Save your Harmony password"
