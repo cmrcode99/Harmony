@@ -120,17 +120,10 @@ enum PrivateSettingsStore {
         return config
     }
 
-    static func loadOrCreate(defaultPaths: [String]) -> AppConfiguration? {
-        if FileManager.default.fileExists(atPath: configurationURL.path) {
-            do {
-                return try loadConfiguration(from: configurationURL)
-            } catch {
-                notice("Could not load Harmony settings", "Your settings were left untouched. Ask your setup agent to repair configuration.json from your backup before starting a new session.")
-                return nil
-            }
-        }
+    static func createConfiguration(defaultPaths: [String], completion: @escaping (AppConfiguration?) -> Void) -> HarmonySettingsWindow? {
         guard UserDefaults.standard.double(forKey: "lockEnd") <= Date().timeIntervalSince1970 else {
             notice("Finish the previous session first", "The earlier Harmony version has an unfinished timed session. Exit it using its eye menu and password, or wait until its timer expires, before setting up this version.")
+            completion(nil)
             return nil
         }
         let paths = Array(Set(defaultPaths.filter { FileManager.default.fileExists(atPath: $0) } + HarmonySettingsModel.fixedApps)).sorted()
@@ -138,7 +131,15 @@ enum PrivateSettingsStore {
         let password = String((0..<50).map { _ in alphabet.randomElement()! })
         let initial = AppConfiguration(unlockDigest: digest(password), approvedPaths: paths,
                                        approvedBundleIDs: Set(paths.compactMap { Bundle(path: $0)?.bundleIdentifier }))
-        guard let edited = HarmonySettingsWindow(configuration: initial, firstRun: true, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil).run() else { return nil }
+        let editor = HarmonySettingsWindow(configuration: initial, firstRun: true, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil, onFinish: { edited in
+            guard let edited else { completion(nil); return }
+            completion(confirmConfiguration(edited, password: password))
+        })
+        editor.show()
+        return editor
+    }
+
+    private static func confirmConfiguration(_ edited: AppConfiguration, password: String) -> AppConfiguration? {
         while true {
             let alert = NSAlert()
             alert.messageText = "Save your Harmony password"
