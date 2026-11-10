@@ -40,6 +40,36 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(calls, [])
 
+    def test_phone_setup_opens_configuration_only_when_off(self):
+        self.env['TEST_RUNNING'] = '0'
+        result, calls = self.run_cli('setup', 'phone')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, [[str(self.root / 'Applications/Harmony.app'), '--args', '--configure-phone']])
+        for state in ['1', 'error']:
+            self.env['TEST_RUNNING'] = state
+            result, calls = self.run_cli('setup', 'phone')
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(calls, [])
+        for args in [('setup', 'unknown'), ('setup', 'phone', 'extra')]:
+            result, calls = self.run_cli(*args)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(calls, [])
+
+    def test_packaged_phone_shortcut_uses_the_same_command(self):
+        shortcut = SOURCE.parents[1] / 'sharing/Setup iPhone.command'
+        result = subprocess.run(['zsh', str(shortcut)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Install Harmony first', result.stderr)
+        installed_cli = self.root / '.local/bin/harmony'
+        installed_cli.parent.mkdir(parents=True)
+        installed_cli.write_text(self.launcher.read_text())
+        installed_cli.chmod(0o755)
+        self.env['TEST_RUNNING'] = '0'
+        result = subprocess.run(['zsh', str(shortcut)], env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in self.log.read_text().splitlines()]
+        self.assertEqual(calls, [[str(self.root / 'Applications/Harmony.app'), '--args', '--configure-phone']])
+
     def test_uninstall_uses_helper_without_opening_the_app(self):
         helper = self.root / '.local/lib/harmony/manage-install.sh'
         helper.parent.mkdir(parents=True)
@@ -133,7 +163,7 @@ class LauncherTests(unittest.TestCase):
             for alias in ['help','--help','-h']:
                 result,calls=self.run_cli(alias);self.assertEqual(result.returncode,0);self.assertEqual(calls,[])
                 outputs.append(result.stdout)
-                for command in ['harmony 1..5','harmony extend N','harmony hide','harmony unhide','harmony phone','harmony exit','harmony help']:
+                for command in ['harmony 1..5','harmony extend N','harmony hide','harmony unhide','harmony phone','harmony setup phone','harmony exit','harmony help']:
                     self.assertIn(command,result.stdout)
             self.assertEqual(outputs[0],outputs[1]);self.assertEqual(outputs[1],outputs[2])
     def test_missing_install_is_clear(self):

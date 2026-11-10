@@ -209,18 +209,18 @@ enum PrivateSettingsStore {
 
     static func configurePhone(_ config: AppConfiguration) {
         let passwordAlert = NSAlert()
-        passwordAlert.messageText = "Set up iPhone entry"
-        passwordAlert.informativeText = "Enter your long Harmony password. This encrypts the existing Screen Time code; it does not change your phone's settings."
+        passwordAlert.messageText = "Optional iPhone helper"
+        passwordAlert.informativeText = "Enter the Harmony recovery password you saved during setup. The next step asks for your existing Screen Time passcode. You can skip the phone helper and keep using Harmony on your Mac."
         let passwordField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 420, height: 24))
         passwordAlert.accessoryView = passwordField
-        passwordAlert.addButton(withTitle: "Continue"); passwordAlert.addButton(withTitle: "Cancel")
+        passwordAlert.addButton(withTitle: "Continue"); passwordAlert.addButton(withTitle: "Skip for now")
         NSApp.activate(ignoringOtherApps: true)
         guard passwordAlert.runModal() == .alertFirstButtonReturn else { return }
         let password = passwordField.stringValue
         guard digest(password) == config.unlockDigest else { notice("Password did not match", "Nothing was changed."); return }
         let alert = NSAlert()
         alert.messageText = "Your existing Screen Time code"
-        alert.informativeText = "Enter the same four-digit code twice. Configure Screen Time and iPhone Mirroring yourself first. Harmony only keeps an encrypted copy."
+        alert.informativeText = "Enter the four-digit Screen Time passcode already set on your iPhone, twice. This is not your iPhone unlock passcode or your Harmony password. Harmony saves an encrypted copy on this Mac; it does not change Screen Time settings."
         let first = NSSecureTextField(frame: NSRect(x: 0, y: 34, width: 300, height: 24))
         let second = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         first.placeholderString = "Existing four-digit code"; second.placeholderString = "Confirm code"
@@ -235,7 +235,7 @@ enum PrivateSettingsStore {
             let vault = try PhoneBridge.seal(pin, password: password)
             let target = folder.appendingPathComponent("phone-vault.json")
             try PrivateSettingsStore.write(JSONEncoder().encode(vault), to: target)
-            notice("Phone helper configured", "Start Harmony, open iPhone Mirroring to the empty Screen Time passcode prompt, then choose Enter phone passcode in the eye menu.")
+            notice("Phone helper configured", "You are ready. Start Harmony, open iPhone Mirroring at an empty Screen Time passcode prompt, then choose Enter phone passcode in the eye menu. You will use your Harmony recovery password each time.")
         } catch { notice("Could not save phone setup", error.localizedDescription) }
     }
 }
