@@ -17,7 +17,12 @@ import Cocoa
         try repairIncludedPlaylist(in: root.appendingPathComponent("included"))
         try await repairImportedPlaylist(in: root.appendingPathComponent("imported"))
         try preserveUnknownFiles(in: root.appendingPathComponent("cleanup"))
+        try await editIncludedPlaylist(in: root.appendingPathComponent("included-editor"))
+        try await rollbackIncludedEdit(in: root.appendingPathComponent("included-rollback"))
+        try await mixAndCancelIncludedEdits(in: root.appendingPathComponent("included-mixed"))
+        try rejectEscapingIncludedPlaylist(in: root.appendingPathComponent("included-unsafe"))
         print("PASS video library: corrupt-catalog repair and rollback, private imports, cancel, original and unknown-file preservation")
+        print("PASS included playlist: loaded order, multi-selection, reorder, remove, save/reopen, restore and rollback")
     }
 
     static func check(_ value: Bool, _ message: String = "Library regression failed") {
@@ -28,6 +33,122 @@ import Cocoa
         let bytes = Data("{ invalid playlist, preserve these exact bytes }\n".utf8)
         try PrivateSettingsStore.write(bytes, to: library.catalog)
         return bytes
+    }
+
+    static func makeIncluded(in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let player = directory.appendingPathComponent("player.html")
+        try Data("<video></video>".utf8).write(to: player)
+        let entries: [[String: Any]] = [
+            ["file": "alpha.mp4", "title": "Alpha", "startSeconds": 120],
+            ["file": "beta.mp4", "title": "Beta", "startSeconds": 60],
+            ["file": "gamma.mp4", "title": "Gamma", "startSeconds": 0]
+        ]
+        for entry in entries {
+            let name = entry["file"] as! String
+            try Data(name.utf8).write(to: directory.appendingPathComponent(name))
+        }
+        let json = try JSONSerialization.data(withJSONObject: entries)
+        try (Data("window.harmonyPlaylist = ".utf8) + json + Data(";\n".utf8))
+            .write(to: directory.appendingPathComponent("playlist.js"))
+        return player
+    }
+
+    @MainActor static func editIncludedPlaylist(in directory: URL) async throws {
+        let player = try makeIncluded(in: directory.appendingPathComponent("Bundle"))
+        let library = VideoLibrary(directory: directory.appendingPathComponent("Media"))
+        let model = HarmonySettingsModel(configuration: configuration, library: library, bundledPlayer: player)
+        precondition(model.useIncludedVideos && model.videos.map(\.title) == ["Alpha", "Beta", "Gamma"])
+        model.selectedVideos = [model.videos[2].id]
+        model.moveVideos(-1)
+        precondition(model.videos.map(\.title) == ["Alpha", "Gamma", "Beta"])
+        model.moveVideos(from: IndexSet(integer: 0), to: 3)
+        precondition(model.videos.map(\.title) == ["Gamma", "Beta", "Alpha"])
+        precondition(!FileManager.default.fileExists(atPath: library.clips.path), "Reordering eagerly copied bundled videos")
+        var saved = false
+        model.onSave = { _ in saved = true }
+        model.save()
+        try await finishImport(model)
+        precondition(saved)
+        let persisted = try library.load()!
+        precondition(persisted.map(\.title) == ["Gamma", "Beta", "Alpha"])
+        precondition(persisted.map(\.startSeconds) == [0, 60, 120])
+        precondition(persisted.allSatisfy { $0.file.hasPrefix("clip-") })
+        let playback = try library.playerURL(bundledPlayer: player)
+        let script = try String(contentsOf: playback.deletingLastPathComponent().appendingPathComponent("playlist.js"), encoding: .utf8)
+        precondition(script.range(of: "Gamma")!.lowerBound < script.range(of: "Alpha")!.lowerBound)
+        let reopened = HarmonySettingsModel(configuration: configuration, library: library, bundledPlayer: player)
+        precondition(!reopened.useIncludedVideos && reopened.videos == persisted)
+        reopened.selectedVideos = Set(reopened.videos.prefix(2).map(\.id))
+        reopened.removeVideos()
+        precondition(reopened.videos.map(\.title) == ["Alpha"])
+        reopened.save()
+        try check(library.load()!.map(\.title) == ["Alpha"])
+        let restored = HarmonySettingsModel(configuration: configuration, library: library, bundledPlayer: player)
+        restored.restoreIncludedVideos()
+        precondition(restored.useIncludedVideos && restored.videos.map(\.title) == ["Alpha", "Beta", "Gamma"])
+        restored.save()
+        try check(library.load() == nil)
+        try check(Data(contentsOf: player.deletingLastPathComponent().appendingPathComponent("alpha.mp4")) == Data("alpha.mp4".utf8))
+    }
+
+    @MainActor static func rollbackIncludedEdit(in directory: URL) async throws {
+        let player = try makeIncluded(in: directory.appendingPathComponent("Bundle"))
+        let library = VideoLibrary(directory: directory.appendingPathComponent("Media"))
+        let model = HarmonySettingsModel(configuration: configuration, library: library, bundledPlayer: player)
+        model.selectedVideos = [model.videos[0].id, model.videos[1].id]
+        model.moveVideos(1)
+        precondition(model.videos.map(\.title) == ["Gamma", "Alpha", "Beta"])
+        model.onSave = { _ in throw CocoaError(.fileWriteNoPermission) }
+        model.save()
+        try await finishImport(model)
+        try check(library.load() == nil, "Failed save replaced the bundled playlist")
+        model.cancel()
+        let copies = try FileManager.default.contentsOfDirectory(at: library.clips, includingPropertiesForKeys: nil)
+        precondition(copies.isEmpty, "Cancelling a failed save retained prepared video copies")
+    }
+
+    static func rejectEscapingIncludedPlaylist(in directory: URL) throws {
+        let player = try makeIncluded(in: directory)
+        try Data("window.harmonyPlaylist = [{\"file\":\"../outside.mp4\",\"title\":\"Unsafe\"}];".utf8)
+            .write(to: directory.appendingPathComponent("playlist.js"))
+        do {
+            _ = try VideoLibrary.includedVideos(player: player)
+            preconditionFailure("Included playlist escaped its bundle")
+        } catch { }
+    }
+
+    @MainActor static func mixAndCancelIncludedEdits(in directory: URL) async throws {
+        let player = try makeIncluded(in: directory.appendingPathComponent("Bundle"))
+        let library = VideoLibrary(directory: directory.appendingPathComponent("Media"))
+        let model = HarmonySettingsModel(configuration: configuration, library: library, bundledPlayer: player)
+        let ownVideo = directory.appendingPathComponent("My video.mov")
+        try Data("my movie".utf8).write(to: ownVideo)
+        model.addVideos([ownVideo])
+        try await finishImport(model)
+        precondition(model.videos.map(\.title) == ["Alpha", "Beta", "Gamma", "My video"])
+        model.save()
+        try await finishImport(model)
+        try check(library.load()!.map(\.title) == ["Alpha", "Beta", "Gamma", "My video"])
+
+        let cancelledLibrary = VideoLibrary(directory: directory.appendingPathComponent("Cancelled"))
+        let cancelled = HarmonySettingsModel(configuration: configuration, library: cancelledLibrary, bundledPlayer: player)
+        cancelled.selectedVideos = [cancelled.videos[0].id]
+        cancelled.moveVideos(1)
+        var finished = false
+        cancelled.finish = { result in precondition(result == nil); finished = true }
+        cancelled.save()
+        cancelled.cancel()
+        for _ in 0..<500 {
+            if finished { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        precondition(finished && !cancelled.busy, "Cancellation did not finish its background cleanup")
+        try check(cancelledLibrary.load() == nil)
+        if FileManager.default.fileExists(atPath: cancelledLibrary.clips.path) {
+            let remaining = try FileManager.default.contentsOfDirectory(atPath: cancelledLibrary.clips.path)
+            precondition(remaining.isEmpty, "Cancelled playlist left video copies or partial files")
+        }
     }
 
     @MainActor static func repairIncludedPlaylist(in directory: URL) throws {

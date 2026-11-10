@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased — 1.7.4
+## Unreleased — 1.7.5
+
+- Show the included videos in playback order and support reordering/removing them, adding custom videos, and restoring the original playlist.
+- Use native selection for videos and settings tabs, with multi-select removal and drag reordering.
+
+## 1.7.4
 
 - Fixed approved apps with bundled helper applications, including Docker Desktop, being force-quit because the helper uses a different bundle identifier.
 

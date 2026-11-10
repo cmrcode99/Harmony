@@ -24,7 +24,7 @@ Choose **Allowed apps** or **Allowed videos** below **Move window** in the eye m
 
 Videos are copied into Harmony's local library. Removing one deletes only that copy; your original file stays put. Changes persist through updates. Settings pause untimed focus while open, and remain locked during timed sessions.
 
-You can add, reorder, or remove videos in one custom playlist, then choose **Use included playlist** to switch back. The default video files are hosted in the [default playlist release](https://github.com/cmrcode99/Harmony/releases/tag/default-videos-v1), and setup downloads them automatically.
+The video editor shows the included playlist in playback order. Drag rows or use the arrow buttons to reorder it; Command-click or Shift-click to select several videos for removal. You can mix in your own videos, save the edited playlist, and choose **Use included playlist** to restore the original order. Originals stay intact. The default video files are hosted in the [default playlist release](https://github.com/cmrcode99/Harmony/releases/tag/default-videos-v1), and setup downloads them automatically.
 
 To remove allowed apps, select a row, or Command-click/Shift-click several rows, then click **Remove apps** and **Save changes**. This changes the allowlist; it does not delete the apps from your Mac. Finder and System Settings always stay allowed.
 

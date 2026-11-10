@@ -2,7 +2,7 @@ import Cocoa
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum SettingsSection: Equatable {
+enum SettingsSection: Hashable {
     case apps, videos
 
     static var launchSelection: Self? {
@@ -24,11 +24,13 @@ enum SettingsSection: Equatable {
     static let fixedApps = ["/System/Library/CoreServices/Finder.app", "/System/Applications/System Settings.app"]
     let original: AppConfiguration
     let library: VideoLibrary
+    private let includedVideos: [LibraryVideo]
+    private let includedSources: [String: URL]
     @Published var appPaths: [String]
     @Published var videos: [LibraryVideo] = []
     @Published var useIncludedVideos = true
     @Published var selectedApps: Set<String> = []
-    @Published var selectedVideo: String?
+    @Published var selectedVideos: Set<String> = []
     @Published var busy = false
     @Published var message = ""
     var onSave: ((AppConfiguration) throws -> Void)?
@@ -38,12 +40,21 @@ enum SettingsSection: Equatable {
     private var closed = false
     @Published private(set) var libraryNeedsRepair = false
 
-    init(configuration: AppConfiguration, library: VideoLibrary = .user) {
+    init(configuration: AppConfiguration, library: VideoLibrary = .user,
+         bundledPlayer: URL? = Bundle.main.url(forResource: "player", withExtension: "html")) {
         original = configuration
         self.library = library
+        var included: [(video: LibraryVideo, url: URL)] = []
+        var includedError: String?
+        do { included = try VideoLibrary.includedVideos(player: bundledPlayer) }
+        catch { includedError = "The included playlist could not be read. You can add your own videos." }
+        includedVideos = included.map(\.video)
+        includedSources = Dictionary(uniqueKeysWithValues: included.map { ($0.video.id, $0.url) })
+        videos = includedVideos
         appPaths = Array(Set(configuration.approvedPaths + Self.fixedApps)).sorted()
         do {
             if let saved = try library.load() { videos = saved; useIncludedVideos = false }
+            else if let includedError { message = includedError }
         } catch { libraryNeedsRepair = true; message = "The video library could not be read. Add videos to replace it, or use the included playlist." }
     }
 
@@ -86,7 +97,10 @@ enum SettingsSection: Equatable {
             } catch { failure = error.localizedDescription }
             let completed = imported, errorMessage = failure
             DispatchQueue.main.async { [weak self] in
-                guard let self, !self.closed else { library.discard(completed); return }
+                guard let self else { library.discard(completed); return }
+                guard !self.closed else {
+                    library.discard(completed); self.busy = false; self.finish?(nil); return
+                }
                 self.busy = false
                 if !completed.isEmpty { self.libraryNeedsRepair = false; self.useIncludedVideos = false; self.videos.append(contentsOf: completed); self.imports.append(contentsOf: completed) }
                 self.message = errorMessage ?? ""
@@ -94,33 +108,93 @@ enum SettingsSection: Equatable {
         }
     }
 
-    func removeVideo() {
-        guard let selectedVideo else { return }
-        videos.removeAll { $0.id == selectedVideo }; self.selectedVideo = nil
+    func removeVideos() {
+        guard !closed, !busy, !selectedVideos.isEmpty else { return }
+        videos.removeAll { selectedVideos.contains($0.id) }
+        selectedVideos.removeAll()
+        libraryNeedsRepair = false
+        useIncludedVideos = false
     }
 
-    func moveVideo(_ offset: Int) {
-        guard let selectedVideo, let index = videos.firstIndex(where: { $0.id == selectedVideo }),
-              videos.indices.contains(index + offset) else { return }
-        videos.swapAt(index, index + offset)
+    func canMoveVideos(_ offset: Int) -> Bool {
+        guard offset == -1 || offset == 1 else { return false }
+        let indices = videos.indices.filter { selectedVideos.contains(videos[$0].id) }
+        guard let first = indices.first, let last = indices.last else { return false }
+        return offset < 0 ? first > 0 : last < videos.count - 1
+    }
+
+    func moveVideos(_ offset: Int) {
+        guard !closed, !busy, canMoveVideos(offset) else { return }
+        let indices = videos.indices.filter { selectedVideos.contains(videos[$0].id) }
+        for index in offset < 0 ? indices : Array(indices.reversed()) {
+            videos.swapAt(index, index + offset)
+        }
+        libraryNeedsRepair = false
+        useIncludedVideos = false
+    }
+
+    func moveVideos(from source: IndexSet, to destination: Int) {
+        guard !closed, !busy else { return }
+        videos.move(fromOffsets: source, toOffset: destination)
+        libraryNeedsRepair = false
+        useIncludedVideos = false
     }
 
     func restoreIncludedVideos() {
-        libraryNeedsRepair = false; useIncludedVideos = true; videos = []; selectedVideo = nil; message = ""
+        guard !closed, !busy else { return }
+        libraryNeedsRepair = false; useIncludedVideos = true; videos = includedVideos; selectedVideos.removeAll(); message = ""
     }
 
     func save() {
         guard !closed, !busy, !libraryNeedsRepair else { return }
+        guard !useIncludedVideos, videos.contains(where: { includedSources[$0.id] != nil }) else {
+            commit(useIncludedVideos ? nil : videos)
+            return
+        }
+        // A customized default playlist gets private copies only when saved.
+        // Copying happens off the main thread so tabs and Cancel remain responsive.
+        busy = true; message = "Preparing your playlist…"
+        let desired = videos, sources = includedSources, library = library, cancellation = cancellation
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var resolved: [LibraryVideo] = [], copies: [LibraryVideo] = []
+            var failure: String?
+            do {
+                for video in desired {
+                    if let source = sources[video.id] {
+                        let imported = try library.importVideo(source, cancellation: cancellation)
+                        let copy = LibraryVideo(file: imported.file, title: video.title, startSeconds: video.startSeconds)
+                        copies.append(copy); resolved.append(copy)
+                    } else { resolved.append(video) }
+                }
+            } catch { failure = error.localizedDescription }
+            let result = resolved, imported = copies, errorMessage = failure
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { library.discard(imported); return }
+                guard !self.closed else {
+                    library.discard(imported); self.busy = false; self.finish?(nil); return
+                }
+                self.busy = false
+                if let errorMessage {
+                    library.discard(imported)
+                    self.message = "Could not prepare the playlist: " + errorMessage
+                    return
+                }
+                self.videos = result; self.selectedVideos.removeAll(); self.imports.append(contentsOf: imported)
+                self.commit(result)
+            }
+        }
+    }
+
+    private func commit(_ updated: [LibraryVideo]?) {
         do {
             let ids = Set(appPaths.compactMap { Bundle(path: $0)?.bundleIdentifier })
             let configuration = try AppConfiguration(unlockDigest: original.unlockDigest, approvedPaths: appPaths, approvedBundleIDs: ids).validated()
-            try library.validate(videos)
+            if let updated { try library.validate(updated) }
             // Preserve the exact catalog, including an invalid playlist that
             // the user has explicitly chosen to replace. Decoding it here would
             // make the offered repair actions fail on Save every time.
             let previous = FileManager.default.fileExists(atPath: library.catalog.path)
                 ? try PrivateSettingsStore.read(from: library.catalog) : nil
-            let updated: [LibraryVideo]? = useIncludedVideos ? nil : videos
             try library.save(updated, prune: false)
             do { try onSave?(configuration) }
             catch {
@@ -135,7 +209,8 @@ enum SettingsSection: Equatable {
 
     func cancel() {
         guard !closed else { return }
-        closed = true; cancellation.cancel(); library.discard(imports); finish?(nil)
+        closed = true; cancellation.cancel(); library.discard(imports)
+        if !busy { finish?(nil) }
     }
 
     func chooseApps() {
@@ -236,18 +311,8 @@ private struct SettingsControlStyle: ViewModifier {
         return true
     }
 
-    private func navigationItem(_ title: String, icon: String, section: SettingsSection) -> some View {
-        Button { selectedSection = section } label: {
-            HStack(spacing: 9) {
-                Image(systemName: icon).frame(width: 18)
-                Text(title).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .font(.system(size: 13, weight: selection == section ? .semibold : .regular))
-            .padding(.horizontal, 10).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 7).fill(selection == section ? Color.accentColor.opacity(0.15) : .clear))
-            .contentShape(Rectangle())
-        }.buttonStyle(.plain)
+    private var sectionBinding: Binding<SettingsSection?> {
+        Binding(get: { selection }, set: { if let section = $0 { selectedSection = section } })
     }
 
     private var sidebar: some View {
@@ -257,8 +322,12 @@ private struct SettingsControlStyle: ViewModifier {
                     .resizable().scaledToFit().frame(width: 30, height: 30)
                 Text("Harmony").font(.system(size: 14, weight: .semibold))
             }.padding(.horizontal, 8).padding(.top, 8).padding(.bottom, 23)
-            navigationItem("Allowed apps", icon: "square.grid.2x2", section: .apps)
-            navigationItem("Allowed videos", icon: "play.rectangle", section: .videos)
+            List(selection: sectionBinding) {
+                Label("Allowed apps", systemImage: "square.grid.2x2").tag(SettingsSection.apps)
+                Label("Allowed videos", systemImage: "play.rectangle").tag(SettingsSection.videos)
+            }
+            .listStyle(.sidebar).scrollContentBackground(.hidden)
+            .font(.system(size: 13)).frame(height: 110)
             Spacer()
             if firstRun {
                 Text("SETUP").font(.system(size: 10, weight: .semibold)).tracking(1)
@@ -292,29 +361,25 @@ private struct SettingsControlStyle: ViewModifier {
 
     private var videoList: some View {
         ZStack {
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
-                        Button { model.selectedVideo = video.id } label: {
-                            HStack(spacing: 10) {
-                                Text(String(index + 1)).font(.caption).monospacedDigit()
-                                    .foregroundStyle(.secondary).frame(width: 18)
-                                Image(systemName: "film").foregroundStyle(.secondary)
-                                Text(video.title).lineLimit(1)
-                                Spacer()
-                                Text(URL(fileURLWithPath: video.file).pathExtension.uppercased())
-                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(.tertiary)
-                            }.padding(.horizontal, 10).padding(.vertical, 11)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(model.selectedVideo == video.id ? Color.accentColor.opacity(0.15) : .clear))
-                                .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(6)
+            List(selection: $model.selectedVideos) {
+                ForEach(Array(model.videos.enumerated()), id: \.element.id) { index, video in
+                    HStack(spacing: 10) {
+                        Text(String(index + 1)).font(.caption).monospacedDigit()
+                            .foregroundStyle(.secondary).frame(width: 18)
+                        Image(systemName: "film").foregroundStyle(.secondary)
+                        Text(video.title).lineLimit(1).help(video.title)
+                        Spacer()
+                    }.padding(.vertical, 7).contentShape(Rectangle())
+                        .tag(video.id).listRowSeparator(.hidden)
+                }
+                .onMove { model.moveVideos(from: $0, to: $1) }
             }
+            .listStyle(.plain).scrollContentBackground(.hidden)
+            .onDeleteCommand(perform: model.removeVideos)
             if model.videos.isEmpty {
                 VStack(spacing: 9) {
                     Image(systemName: "play.rectangle").font(.system(size: 28, weight: .light))
-                    Text(model.useIncludedVideos ? "Using the included playlist" : "No videos added").font(.system(size: 13, weight: .medium))
+                    Text(model.useIncludedVideos ? "No included videos in this build" : "No videos added").font(.system(size: 13, weight: .medium))
                     Text("Add your own videos anytime.").font(.caption)
                 }.foregroundStyle(.secondary).allowsHitTesting(false)
             }
@@ -329,7 +394,7 @@ private struct SettingsControlStyle: ViewModifier {
             Divider()
             HStack(spacing: 7) {
                 Image(systemName: "plus.circle.dashed")
-                Text(selection == .apps ? "Drop apps here from Applications" : "Drop MP4, MOV, or M4V videos here")
+                Text(selection == .apps ? "Drop apps here from Applications" : "Drop videos to add · Drag rows to reorder")
                     .font(.caption)
                 Spacer()
             }.foregroundStyle((selection == .apps ? appsTargeted : videosTargeted) ? Color.accentColor : (colorScheme == .dark ? Color.white.opacity(0.6) : Color.black.opacity(0.6)))
@@ -352,14 +417,14 @@ private struct SettingsControlStyle: ViewModifier {
                     .disabled(model.removableSelectedApps.isEmpty)
             } else {
                 Button("Add videos", action: model.chooseVideos)
-                Button("Remove", action: model.removeVideo).disabled(model.selectedVideo == nil)
+                Button("Remove videos", action: model.removeVideos).disabled(model.selectedVideos.isEmpty)
                 ControlGroup {
-                    Button { model.moveVideo(-1) } label: { Image(systemName: "arrow.up") }
+                    Button { model.moveVideos(-1) } label: { Image(systemName: "arrow.up") }
                         .help("Move earlier").accessibilityLabel("Move video earlier")
-                        .disabled(model.selectedVideo == nil || model.videos.first?.id == model.selectedVideo)
-                    Button { model.moveVideo(1) } label: { Image(systemName: "arrow.down") }
+                        .disabled(!model.canMoveVideos(-1))
+                    Button { model.moveVideos(1) } label: { Image(systemName: "arrow.down") }
                         .help("Move later").accessibilityLabel("Move video later")
-                        .disabled(model.selectedVideo == nil || model.videos.last?.id == model.selectedVideo)
+                        .disabled(!model.canMoveVideos(1))
                 }.fixedSize()
                 Spacer()
                 Button("Use included playlist", action: model.restoreIncludedVideos)
@@ -379,7 +444,7 @@ private struct SettingsControlStyle: ViewModifier {
                             Text(selection == .apps ? "Allowed apps" : "Allowed videos")
                                 .font(.system(size: 21, weight: .semibold))
                             Spacer()
-                            Text(selection == .apps ? "\(model.appPaths.count) apps" : (model.useIncludedVideos ? "Included playlist" : "\(model.videos.count) videos"))
+                            Text(selection == .apps ? "\(model.appPaths.count) apps" : "\(model.videos.count) videos" + (model.useIncludedVideos ? " · Included" : ""))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Text(selection == .apps ? "Other apps are force-quit during focus." : "Harmony copies your videos. Your originals stay untouched.")

@@ -309,11 +309,11 @@ struct AppIntegrationTests {
             precondition(HarmonySettingsModel.fixedApps.allSatisfy(model.appPaths.contains), "Multiple removal removed a protected app")
             precondition(FileManager.default.fileExists(atPath: editorPath) && FileManager.default.fileExists(atPath: browserPath), "Allowlist removal deleted an application")
             model.addApps([application.deletingLastPathComponent()])
-            model.selectedVideo = two.id
-            model.moveVideo(-1)
+            model.selectedVideos = [two.id]
+            model.moveVideos(-1)
             precondition(model.videos.map(\.id) == [two.id, one.id])
-            model.selectedVideo = one.id
-            model.removeVideo()
+            model.selectedVideos = [one.id]
+            model.removeVideos()
             model.onSave = { _ in throw CocoaError(.fileWriteNoPermission) }
             model.save()
             let unchanged = try library.load()

@@ -25,6 +25,38 @@ struct VideoLibrary: Sendable {
     static var user: Self { Self(directory: AppSetup.folder.appendingPathComponent("Media", isDirectory: true)) }
     static let extensions = Set(["mp4", "m4v", "mov"])
 
+    /// Read the same generated playlist the player uses, without evaluating JavaScript.
+    static func includedVideos(player: URL?) throws -> [(video: LibraryVideo, url: URL)] {
+        guard let player else { return [] }
+        let root = player.deletingLastPathComponent().resolvingSymlinksInPath()
+        let scriptURL = root.appendingPathComponent("playlist.js")
+        guard FileManager.default.fileExists(atPath: scriptURL.path) else { return [] }
+        let script = try String(contentsOf: scriptURL, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = "window.harmonyPlaylist = "
+        guard script.hasPrefix(prefix), script.hasSuffix(";") else { throw CocoaError(.fileReadCorruptFile) }
+        let json = String(script.dropFirst(prefix.count).dropLast())
+        struct Entry: Decodable { let file: String; let title: String; let startSeconds: Double? }
+        let entries = try JSONDecoder().decode([Entry].self, from: Data(json.utf8))
+        guard entries.count <= 1024 else { throw CocoaError(.fileReadCorruptFile) }
+        var result: [(video: LibraryVideo, url: URL)] = []
+        var seen = Set<String>()
+        for entry in entries {
+            let file = entry.file, title = entry.title
+            guard !file.hasPrefix("/"), !file.contains("\\"), !file.split(separator: "/").contains(".."),
+                  seen.insert(file).inserted else { throw CocoaError(.fileReadCorruptFile) }
+            let url = root.appendingPathComponent(file).resolvingSymlinksInPath()
+            let start = entry.startSeconds ?? 0
+            let attributes = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            guard url.path.hasPrefix(root.path + "/"), extensions.contains(url.pathExtension.lowercased()),
+                  start.isFinite, start >= 0,
+                  attributes.isRegularFile == true, (attributes.fileSize ?? 0) > 0 else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            result.append((LibraryVideo(file: "included:" + file, title: title, startSeconds: start), url))
+        }
+        return result
+    }
+
     func validate(_ videos: [LibraryVideo]) throws {
         guard videos.count <= 1024, Set(videos.map(\.file)).count == videos.count,
               videos.allSatisfy({ video in
