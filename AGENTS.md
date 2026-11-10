@@ -1,11 +1,21 @@
 # Working on Harmony
 
-- Read README.md. Run `./setup.sh --check` to discover missing tools or media.
-- Use `./setup.sh --video /absolute/path/to/video.mp4` for a fresh checkout, or `./setup.sh` with existing playlist media. Use `--no-open` for a noninteractive install.
-- Setup installs locally and opens per-user configuration; it does not start focus restrictions. Help the user choose allowed apps and save their recovery password privately.
-- Use `~/.local/bin/harmony help` without changing the user's shell configuration. Start focus mode when the user wants it: unapproved apps are force-quit.
-- App settings: `~/Library/Application Support/Harmony Focus/configuration.json`. `approvedPaths` contains application paths; `approvedBundleIDs` contains the corresponding bundle identifiers. Keep both synchronized when changing the allowlist with the app off. Preserve the existing `unlockDigest`.
-- Never put local settings, passwords, phone vaults, signing keys, or video assets in commits. Do not print the recovery password or phone code into chat.
-- Run `make check` after code changes. Use `./build.sh --stage-only /tmp/Harmony.app` to review a build without replacing or starting an installed app.
-- `make share` creates a signed ZIP plus checksum in `dist/`; it does not publish anything. Run `python3 tools/check-release.py .` before publishing source.
-- Keep the session/recovery behavior intact when editing setup or renaming identifiers. Stop an active timed session through the app before replacing it.
+## Setup and local use
+
+- Read README.md. Use `./setup.sh --check --video /absolute/path/to/video.mp4` for a read-only preflight, then `./setup.sh --video /absolute/path/to/video.mp4` to install. Existing playlist media also works with `./setup.sh`. `--no-open` skips the configuration window.
+- Setup does not start focus restrictions. Help the user choose allowed apps and save their generated recovery password privately. Use `~/.local/bin/harmony help` without changing shell configuration.
+- Starting focus mode force-quits unapproved apps. Only start when the user wants that behavior. End an active session through the app before updating or uninstalling it.
+- `harmony uninstall` and `./uninstall.sh` preserve local settings. `--remove-data` is an explicit request to delete configuration and the encrypted vault.
+
+## Changes and checks
+
+- See CONTRIBUTING.md for the code map. Keep lifecycle, menu, overlay, and player changes in their respective files; preserve timer, password, and recovery behavior.
+- Run `make check` after code changes. Use `./build.sh --stage-only /tmp/Harmony.app` with a new destination to inspect a build without replacing or starting the installed app.
+- Run the live UI smoke test only with focus sessions off. It uses isolated preferences and disabled enforcement. Device permissions and actual phone input still require deliberate manual testing.
+- `make share` creates a local package and checksum in `dist/`; it does not publish them. Run the release checks described in docs/releases.md before distributing a package.
+
+## Private data
+
+- Settings live in `~/Library/Application Support/Harmony Focus/configuration.json`. `approvedPaths` and `approvedBundleIDs` must describe the same allowed apps. Edit only with Harmony off and preserve `unlockDigest`.
+- Never commit local settings, phone vaults, passwords, signing credentials, or third-party video assets. Never print a recovery password or phone code into chat, logs, or issues.
+- Do not change a password hash as an installation shortcut: the encrypted phone vault depends on the original password. See docs/local-data.md.

@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible Harmony problem.
+title: "Bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, use SECURITY.md. Do not include passwords, phone codes, private screenshots, configuration files, or phone vaults.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "Version from the app, or git rev-parse --short HEAD"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: macOS version and Mac architecture
+      placeholder: "macOS version; Apple Silicon or Intel"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and observed result
+      description: Include the expected result and whether a focus session was active.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Include redacted errors or relevant checks you tried.
