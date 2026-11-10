@@ -357,7 +357,7 @@ private struct SettingsControlStyle: ViewModifier {
                 }.fixedSize()
                 Spacer()
                 Button("Use included playlist", action: model.restoreIncludedVideos)
-                    .buttonStyle(.link).font(.caption).disabled(model.useIncludedVideos)
+                    .buttonStyle(.link).font(.caption).disabled(model.useIncludedVideos && !model.libraryNeedsRepair)
             }
             if selection == .apps { Spacer() }
         }.controlSize(.regular).modifier(SettingsControlStyle())
