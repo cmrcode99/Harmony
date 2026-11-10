@@ -1,15 +1,65 @@
 name: Check Harmony
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: harmony-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
-    runs-on: macos-26
+  macos:
+    name: macOS (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            arch: arm64
+          - runner: macos-26-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Check source export
-        run: python3 tools/check-release.py .
+      - name: Verify native architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: test "$(uname -m)" = "$EXPECTED_ARCH"
+      - name: Check source export and shell syntax
+        run: |
+          python3 tools/check-release.py . --mode source
+          for script in *.sh bin/harmony tests/*.sh tools/*.sh sharing/*.command sharing/*.sh; do
+            if [ -f "$script" ]; then zsh -n "$script"; fi
+          done
       - name: Test and typecheck
         run: make check
+      - name: Build and verify native app
+        env:
+          HARMONY_ARCH: ${{ matrix.arch }}
+        run: |
+          # A disposable resource exercises bundling. This is not playback coverage
+          # and is never uploaded or published as a release.
+          printf 'CI resource fixture\n' > video.mp4
+          ./build.sh --stage-only "$RUNNER_TEMP/Harmony.app"
+          test "$(lipo -archs "$RUNNER_TEMP/Harmony.app/Contents/MacOS/HarmonyFocus")" = "$HARMONY_ARCH"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Harmony.app"
+          python3 tools/check-release.py "$RUNNER_TEMP/Harmony.app" --mode package
+
+  check:
+    name: check
+    if: always()
+    needs: macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both native checks
+        env:
+          RESULT: ${{ needs.macos.result }}
+        run: test "$RESULT" = success
