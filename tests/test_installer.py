@@ -86,6 +86,8 @@ if args[0] == '--verify' and os.environ.get('TEST_FAIL_SIGNATURE') == '1': sys.e
         self.assertEqual((self.app / 'version').read_text(), 'two')
         self.assertTrue(any(command[0] == 'bootout' for command in self.commands()))
         self.assertFalse(any(command[0] == 'open' for command in self.commands()))
+        self.assertEqual(list(self.home.rglob('*.app')), [self.app], 'updates must leave one installed app')
+        self.assertEqual(list((self.home / 'Applications').glob('.harmony-maintenance.*')), [])
 
     def test_bootstrap_failure_restores_all_previous_artifacts_and_service(self):
         self.install()
