@@ -18,6 +18,10 @@ struct AppIntegrationTests {
         let controller = App()
         controller.lockWallEnd = 0
         controller.focusEnabled = false
+        controller.settingsOpen = true
+        controller.beginLock(hours: 1)
+        precondition(controller.lockWallEnd == 0, "Settings allowed a timed session to start")
+        controller.settingsOpen = false
         controller.installApplicationMenu()
         let setupMenu = application.mainMenu!.items[0].submenu!
         precondition(setupMenu.items.first(where: { $0.keyEquivalent == "h" })?.isEnabled == false,
@@ -85,6 +89,7 @@ struct AppIntegrationTests {
         print("PASS production menus: setup readiness, native app controls, eye-only timed exit, independent menu ownership")
         print("PASS modern status menu: original command dispatch, disabled/stale action rejection, change-only snapshots, toggle state")
         testTimerExtension(controller)
+        testSettingsLibrary()
         testPlaybackSnapshots(controller)
     }
 
@@ -129,6 +134,78 @@ struct AppIntegrationTests {
                      "An old page's callback changed the new page's native controls")
         controller.playerJavaScriptInFlight = false
         print("PASS native playback snapshots: unavailable timeline clearing, valid restoration, stale generation/revision rejection, pending seek/skip preservation")
+    }
+
+    @MainActor private static func testSettingsLibrary() {
+        do {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("harmony-settings-" + UUID().uuidString)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let library = VideoLibrary(directory: root.appendingPathComponent("Media"))
+            let first = root.appendingPathComponent("my #video.mp4")
+            let second = root.appendingPathComponent("second.mov")
+            try Data("first".utf8).write(to: first)
+            try Data("second".utf8).write(to: second)
+            let one = try library.importVideo(first)
+            let two = try library.importVideo(second)
+            let initialLibrary = try library.load()
+            precondition(initialLibrary == nil)
+            try library.save([one, two])
+            let config = AppConfiguration(unlockDigest: String(repeating: "a", count: 64), approvedPaths: [])
+            let model = HarmonySettingsModel(configuration: config, library: library)
+            model.selectedApp = HarmonySettingsModel.fixedApps[0]
+            model.removeApp()
+            precondition(model.appPaths.contains(HarmonySettingsModel.fixedApps[0]))
+            let application = root.appendingPathComponent("Editor.app/Contents")
+            try FileManager.default.createDirectory(at: application, withIntermediateDirectories: true)
+            let info = try PropertyListSerialization.data(fromPropertyList: ["CFBundleIdentifier": "test.harmony.editor", "CFBundlePackageType": "APPL"], format: .xml, options: 0)
+            try info.write(to: application.appendingPathComponent("Info.plist"))
+            model.addApps([application.deletingLastPathComponent(), application.deletingLastPathComponent()])
+            precondition(model.appPaths.filter { $0.hasSuffix("Editor.app") }.count == 1)
+            model.selectedVideo = two.id
+            model.moveVideo(-1)
+            precondition(model.videos.map(\.id) == [two.id, one.id])
+            model.selectedVideo = one.id
+            model.removeVideo()
+            model.onSave = { _ in throw CocoaError(.fileWriteNoPermission) }
+            model.save()
+            let unchanged = try library.load()
+            precondition(unchanged == [one, two], "Failed settings save changed the playlist")
+            precondition(FileManager.default.fileExists(atPath: library.clips.appendingPathComponent(one.file).path))
+            var saved: AppConfiguration?
+            model.onSave = { saved = $0 }
+            model.save()
+            precondition(saved?.unlockDigest == config.unlockDigest, "Settings changed the recovery password")
+            precondition(saved?.approvedIDs.contains("test.harmony.editor") == true)
+            let restored = try library.load()
+            precondition(restored == [two])
+            precondition(FileManager.default.fileExists(atPath: first.path), "Removing a video deleted its original")
+            precondition(!FileManager.default.fileExists(atPath: library.clips.appendingPathComponent(one.file).path))
+            let html = root.appendingPathComponent("player.html")
+            try Data("<video></video>".utf8).write(to: html)
+            let page = try library.playerURL(bundledPlayer: html)
+            precondition(page.deletingLastPathComponent().standardizedFileURL.path == library.directory.standardizedFileURL.path, "Custom player left its allowed library directory")
+            let script = try String(contentsOf: library.directory.appendingPathComponent("playlist.js"), encoding: .utf8)
+            precondition(script.contains(two.file))
+            try library.save(nil)
+            let defaultLibrary = try library.load()
+            let defaultPlayer = try library.playerURL(bundledPlayer: html)
+            precondition(defaultLibrary == nil && defaultPlayer == html)
+            let cancellation = ImportCancellation(); cancellation.cancel()
+            var cancelled = false
+            do { _ = try library.importVideo(first, cancellation: cancellation) } catch { cancelled = true }
+            precondition(cancelled)
+            let external = root.appendingPathComponent("originals")
+            try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+            let protectedVideo = external.appendingPathComponent(one.file)
+            try Data("original".utf8).write(to: protectedVideo)
+            let linked = VideoLibrary(directory: root.appendingPathComponent("linked-library"))
+            try FileManager.default.createDirectory(at: linked.directory, withIntermediateDirectories: true)
+            try FileManager.default.createSymbolicLink(at: linked.clips, withDestinationURL: external)
+            try linked.save(nil)
+            precondition(FileManager.default.fileExists(atPath: protectedVideo.path), "Cleanup followed a directory link into original media")
+            print("PASS settings: protected apps, playlist ordering/removal, private copies, password preservation and cancellation")
+        } catch { fatalError("Settings regression failed: \(error)") }
     }
 
     @MainActor private static func testTimerExtension(_ controller: App) {

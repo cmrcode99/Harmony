@@ -42,6 +42,12 @@ class ResourceTests(unittest.TestCase):
         with self.assertRaisesRegex(FileNotFoundError, 'setup.sh --video'):
             resources.available_playlist(self.root)
 
+    def test_empty_bundle_allows_adding_videos_in_the_app(self):
+        target = self.root / 'output'
+        resources.copy_resources(target, self.root, allow_empty=True)
+        self.assertIn('window.harmonyPlaylist = []', (target / 'playlist.js').read_text())
+        self.assertTrue((target / 'player.html').is_file())
+
     def test_one_video_is_enough_and_missing_optional_is_not_bundled(self):
         (self.root / 'video.mp4').write_bytes(b'local fixture')
         target = self.root / 'output'
@@ -112,8 +118,8 @@ class ResourceTests(unittest.TestCase):
         video = self.root / 'my clip.mp4'
         video.write_bytes(b'fixture')
         missing = subprocess.run(['zsh', str(self.root / 'setup.sh'), '--check'], capture_output=True, text=True)
-        self.assertNotEqual(missing.returncode, 0)
-        self.assertIn('setup.sh --video', missing.stderr)
+        self.assertEqual(missing.returncode, 0, missing.stderr)
+        self.assertIn('0 local video(s)', missing.stdout)
         result = subprocess.run(['zsh', str(self.root / 'setup.sh'), '--video', str(video), '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.root / 'video.mp4').exists())

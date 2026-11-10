@@ -26,7 +26,7 @@ mkdir -p "$APP/Contents/MacOS"
 swiftc -O -whole-module-optimization -target "${HARMONY_ARCH:-$(uname -m)}-apple-macosx13.0" *.swift -o "$APP/Contents/MacOS/HarmonyFocus" -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
 cp Info.plist "$APP/Contents/Info.plist"
 mkdir -p "$APP/Contents/Resources"
-python3 tools/copy-player-resources.py "$APP/Contents/Resources"
+python3 tools/copy-player-resources.py "$APP/Contents/Resources" --allow-empty
 if [[ -n "${HARMONY_ICON:-}" ]]; then
   [[ -f "$HARMONY_ICON" ]] || { print -u2 'HARMONY_ICON must point to an .icns file.'; exit 1; }
   cp "$HARMONY_ICON" "$APP/Contents/Resources/Harmony.icns"

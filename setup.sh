@@ -38,9 +38,9 @@ if [[ -n "$video" ]]; then
   [[ -s "$video" ]] || { print -u2 'The selected video is empty.'; exit 1; }
   python3 tools/copy-player-resources.py --check --video "$video"
 else
-  python3 tools/copy-player-resources.py --check
+  python3 tools/copy-player-resources.py --check --allow-empty
 fi
-print 'Requirements ready: macOS, Swift, Python, local video.'
+print 'Requirements ready: macOS, Swift, Python. Videos can be added in the app.'
 if (( check_only )); then exit 0; fi
 if [[ -n "$video" ]]; then
   python3 - "$video" <<'MEDIA'

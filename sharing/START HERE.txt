@@ -6,7 +6,7 @@ Give your agent this folder and say:
 Explain what I need to do myself. Set up the Mac first, and ask about the
 optional phone helper afterward.”
 
-You choose which apps stay available, save your Harmony recovery password,
+Drag apps and videos into the setup window, save your Harmony recovery password,
 and approve macOS permissions. Enter passwords only in the app's local
 windows, never in chat.
 

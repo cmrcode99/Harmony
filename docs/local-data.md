@@ -17,9 +17,11 @@ End the current session and quit Harmony. Rerun setup from an updated source che
 
 If installation reports an unfinished session, finish it through the eye menu with the recovery password, or let its deadline pass. Do not delete a deadline or kill a process as an update shortcut.
 
-## Change allowed apps
+## Change allowed apps and videos
 
-With Harmony off, an agent can update `configuration.json`. Keep `approvedPaths` and `approvedBundleIDs` synchronized using real app paths and their bundle identifiers. Preserve `version` and `unlockDigest`. Finder and System Settings remain permitted.
+Open **Apps and videos…** in Harmony or run `harmony setup` while the app is off. Drag apps or video files into their lists, or use the Add/Remove buttons. Changes are saved locally; no rebuild or JSON editing is needed. Timed sessions must finish before settings can change.
+
+Custom videos and their playlist are in `~/Library/Application Support/Harmony Focus/Media/`. Removing a video removes Harmony’s copy only. To return to the bundled playlist, choose **Use included playlist**. User media is preserved by default during uninstall. Advanced configuration edits must preserve `version` and `unlockDigest` and keep app paths and bundle identifiers synchronized.
 
 ## Passwords and phone setup
 

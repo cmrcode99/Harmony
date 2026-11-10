@@ -9,7 +9,7 @@ import stat
 import sys
 
 
-def available_playlist(root: Path, video_override: Path = None) -> list:
+def available_playlist(root: Path, video_override: Path = None, allow_empty: bool = False) -> list:
     root = root.resolve()
     playlist = json.loads((root / 'media/playlist.json').read_text())
     if not isinstance(playlist, list) or not playlist:
@@ -53,14 +53,14 @@ def available_playlist(root: Path, video_override: Path = None) -> list:
             raise ValueError('Duplicate playlist file: ' + name)
         identities.add(identity)
         available.append({**entry, 'file': normalized_name})
-    if not available:
+    if not available and not allow_empty:
         raise FileNotFoundError('Add a local MP4 with ./setup.sh --video /path/to/video.mp4, or add videos listed in media/playlist.json.')
     return available
 
 
-def copy_resources(destination: Path, root: Path = None) -> None:
+def copy_resources(destination: Path, root: Path = None, allow_empty: bool = False) -> None:
     root = root or Path(__file__).resolve().parents[1]
-    playlist = available_playlist(root)
+    playlist = available_playlist(root, allow_empty=allow_empty)
     destination.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(root / 'player.html', destination / 'player.html')
     for entry in playlist:
@@ -74,6 +74,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('destination', nargs='?', type=Path)
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--allow-empty', action='store_true', help='Allow videos to be added later in the app.')
     parser.add_argument('--video', type=Path, help='Check an effective first-video replacement without writing it.')
     args = parser.parse_args()
     if args.check == (args.destination is not None) or (args.video is not None and not args.check):
@@ -81,8 +82,8 @@ if __name__ == '__main__':
     try:
         if args.check:
             root = Path(__file__).resolve().parents[1]
-            print(f'{len(available_playlist(root, video_override=args.video))} local video(s) available.')
+            print(f'{len(available_playlist(root, video_override=args.video, allow_empty=args.allow_empty))} local video(s) available.')
         else:
-            copy_resources(args.destination)
+            copy_resources(args.destination, allow_empty=args.allow_empty)
     except (ValueError, OSError) as error:
         raise SystemExit(str(error))

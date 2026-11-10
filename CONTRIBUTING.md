@@ -32,6 +32,14 @@ For a signed build without installation:
 
 Use a destination that does not exist. With focus sessions off and local video available, run `python3 tests/run-ui-smoke.py` for actual AppKit/WebKit startup. `--minute-timer` exercises cold timer startup; `--playlist-smoke` expects all four configured playlist files. These checks do not establish that every macOS permission flow or phone configuration works; record any manual device verification separately.
 
+Render the settings screen with sample data, without starting a focus session:
+
+```sh
+make preview-settings
+```
+
+The PNG is written to `.build/settings-preview.png`.
+
 ## Pull requests
 
 Explain the problem, the resulting behavior, and the checks you ran. Include a regression test for a behavioral fix when it can be tested reliably. Keep unrelated formatting and refactoring out of the change. For UI changes, add a screenshot made from the actual app using non-private media.

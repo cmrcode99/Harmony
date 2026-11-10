@@ -149,7 +149,8 @@ extension App {
     }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { reload() }
     @objc func reload() {
-        guard let url = Bundle.main.url(forResource: "player", withExtension: "html") else { return }
+        guard let bundledURL = Bundle.main.url(forResource: "player", withExtension: "html") else { return }
+        let url = (try? VideoLibrary.user.playerURL(bundledPlayer: bundledURL)) ?? bundledURL
         playerGeneration += 1
         playbackRevision = 0
         playerReady = false
