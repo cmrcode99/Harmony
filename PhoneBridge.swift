@@ -23,7 +23,16 @@ import CoreML
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Harmony Focus/phone-vault.json")
     }
-    struct Vault: Codable { let salt: Data; let sealed: Data }
+    struct Vault: Codable {
+        let salt: Data
+        let sealed: Data
+        // Allows an encrypted vault to survive a product-identifier migration.
+        // This is public KDF metadata, never the password or phone code.
+        let keyContext: Data?
+        init(salt: Data, sealed: Data, keyContext: Data? = nil) {
+            self.salt = salt; self.sealed = sealed; self.keyContext = keyContext
+        }
+    }
     init(unlockDigest: String) { self.unlockDigest = unlockDigest }
     private let prompt = PhonePrompt()
     private func message(_ title: String, _ detail: String) async {
@@ -38,18 +47,20 @@ import CoreML
         UserDefaults.standard.set(detail, forKey: "phoneStatusDetail")
         return await prompt.present(title: title, detail: detail, primary: button, secureInput: true, keyboardOnly: true)
     }
-    private static func key(_ password: String, salt: Data) -> SymmetricKey {
+    private static func key(_ password: String, salt: Data, context: Data? = nil) -> SymmetricKey {
         HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: Data(password.utf8)), salt: salt,
-                             info: Data("local.harmony.phone.v1".utf8), outputByteCount: 32)
+                             info: context ?? Data("local.harmony.phone.v1".utf8), outputByteCount: 32)
     }
-    static func seal(_ pin: String, password: String) throws -> Vault {
+    static func seal(_ pin: String, password: String, keyContext: Data? = nil) throws -> Vault {
+        guard keyContext == nil || keyContext!.count <= 128 else { throw NSError(domain: "Harmony", code: 3) }
         let salt = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
-        let box = try AES.GCM.seal(Data(pin.utf8), using: key(password, salt: salt))
+        let box = try AES.GCM.seal(Data(pin.utf8), using: key(password, salt: salt, context: keyContext))
         guard let combined = box.combined else { throw NSError(domain: "Harmony", code: 1) }
-        return Vault(salt: salt, sealed: combined)
+        return Vault(salt: salt, sealed: combined, keyContext: keyContext)
     }
     static func open(_ vault: Vault, password: String) throws -> String {
-        let plaintext = try AES.GCM.open(AES.GCM.SealedBox(combined: vault.sealed), using: key(password, salt: vault.salt))
+        guard vault.keyContext == nil || vault.keyContext!.count <= 128 else { throw NSError(domain: "Harmony", code: 3) }
+        let plaintext = try AES.GCM.open(AES.GCM.SealedBox(combined: vault.sealed), using: key(password, salt: vault.salt, context: vault.keyContext))
         guard let pin = String(data: plaintext, encoding: .utf8), pin.count == 4,
               pin.utf8.allSatisfy({ (48...57).contains($0) }) else { throw NSError(domain: "Harmony", code: 2) }
         return pin

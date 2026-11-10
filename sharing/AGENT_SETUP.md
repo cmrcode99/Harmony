@@ -29,7 +29,7 @@ Help the user enable Harmony under **System Settings → Privacy & Security → 
 
 Verify `~/.local/bin/harmony help`. When the user is ready to try focus mode, use `~/.local/bin/harmony`; exit an untimed session with `~/.local/bin/harmony exit`. Timed early exit uses the eye menu and recovery password. Do not start a timed test as part of installation.
 
-For later changes, open **Apps and videos…** in Harmony, or use `harmony setup` while it is off. Untimed focus pauses while settings are open. Timed sessions must finish first. There is no need to edit JSON for normal app or video changes.
+For later changes, use **Allowed apps…** or **Allowed videos…** below **Move window** in the eye menu. Each opens Finder with the relevant settings area. `harmony setup apps` and `harmony setup videos` do the same while Harmony is off. Untimed focus pauses while settings are open. Timed sessions must finish first. There is no need to edit JSON for normal app or video changes.
 
 ### 3. Offer the phone helper, with “skip for now” as a complete outcome
 

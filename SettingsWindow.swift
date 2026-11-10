@@ -2,6 +2,24 @@ import Cocoa
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum SettingsSection: Equatable {
+    case apps, videos
+
+    static var launchSelection: Self? {
+        if CommandLine.arguments.contains("--settings-apps") { return .apps }
+        if CommandLine.arguments.contains("--settings-videos") { return .videos }
+        return nil
+    }
+
+    var finderDirectory: URL {
+        if self == .apps { return URL(fileURLWithPath: "/Applications", isDirectory: true) }
+        let manager = FileManager.default
+        let movies = manager.urls(for: .moviesDirectory, in: .userDomainMask).first!
+        if manager.fileExists(atPath: movies.path) { return movies }
+        return manager.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? manager.homeDirectoryForCurrentUser
+    }
+}
+
 @MainActor final class HarmonySettingsModel: ObservableObject {
     static let fixedApps = ["/System/Library/CoreServices/Finder.app", "/System/Applications/System Settings.app"]
     let original: AppConfiguration
@@ -154,6 +172,7 @@ private struct SettingsButtonStyle: ButtonStyle {
     @ObservedObject var model: HarmonySettingsModel
     var firstRun = false
     var sessionPaused = false
+    var section: SettingsSection? = nil
     @State private var appsTargeted = false
     @State private var videosTargeted = false
 
@@ -181,7 +200,7 @@ private struct SettingsButtonStyle: ButtonStyle {
                 Image(systemName: "eye.fill").font(.system(size: 32)).foregroundStyle(.teal)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(firstRun ? "Make room for focus" : "Harmony settings").font(.title2.bold())
-                    Text("Choose your apps and videos. Your agent can help with the rest.").foregroundStyle(.secondary)
+                    Text(section == .apps ? "Drag apps from Finder into Allowed apps." : (section == .videos ? "Drag your videos from Finder into Your videos." : "Choose your apps and videos. Your agent can help with the rest.")).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -205,7 +224,7 @@ private struct SettingsButtonStyle: ButtonStyle {
                         }.padding(6)
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(nsColor: .textBackgroundColor).opacity(0.4))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(appsTargeted ? Color.teal : Color.secondary.opacity(0.2), lineWidth: appsTargeted ? 3 : 1))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke((appsTargeted || section == .apps) ? Color.teal : Color.secondary.opacity(0.2), lineWidth: (appsTargeted || section == .apps) ? 3 : 1))
                     .onDrop(of: [UTType.fileURL.identifier], isTargeted: $appsTargeted) { receive($0, apps: true) }
                     HStack {
                         Button("Add apps…", action: model.chooseApps)
@@ -240,7 +259,7 @@ private struct SettingsButtonStyle: ButtonStyle {
                             }.foregroundStyle(.secondary).allowsHitTesting(false)
                         }
                     }
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(videosTargeted ? Color.teal : Color.secondary.opacity(0.2), lineWidth: videosTargeted ? 3 : 1))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke((videosTargeted || section == .videos) ? Color.teal : Color.secondary.opacity(0.2), lineWidth: (videosTargeted || section == .videos) ? 3 : 1))
                     .onDrop(of: [UTType.fileURL.identifier], isTargeted: $videosTargeted) { receive($0, apps: false) }
                     HStack {
                         Button("Add videos…", action: model.chooseVideos)
@@ -274,17 +293,22 @@ private struct SettingsButtonStyle: ButtonStyle {
     let model: HarmonySettingsModel
     let window: NSWindow
     private var result: AppConfiguration?
+    private let section: SettingsSection?
+    private let revealFinder: Bool
 
     init(configuration: AppConfiguration, firstRun: Bool = false, sessionPaused: Bool = false, library: VideoLibrary = .user,
+         section: SettingsSection? = nil, revealFinder: Bool = false,
          onSave: ((AppConfiguration) throws -> Void)? = nil) {
+        self.section = section
+        self.revealFinder = revealFinder
         model = HarmonySettingsModel(configuration: configuration, library: library)
         model.onSave = onSave
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 540), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
-        window.title = firstRun ? "Welcome to Harmony" : "Harmony Settings"
+        window.title = firstRun ? "Welcome to Harmony" : (section == .apps ? "Allowed Apps — Harmony" : (section == .videos ? "Allowed Videos — Harmony" : "Harmony Settings"))
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 780, height: 520)
-        window.contentView = NSHostingView(rootView: HarmonySettingsView(model: model, firstRun: firstRun, sessionPaused: sessionPaused))
+        window.contentView = NSHostingView(rootView: HarmonySettingsView(model: model, firstRun: firstRun, sessionPaused: sessionPaused, section: section))
         window.delegate = self
         model.finish = { [weak self] configuration in
             self?.result = configuration
@@ -294,7 +318,16 @@ private struct SettingsButtonStyle: ButtonStyle {
     }
 
     func run() -> AppConfiguration? {
-        window.center(); window.makeKeyAndOrderFront(nil)
+        window.center()
+        if revealFinder, let section {
+            NSWorkspace.shared.open(section.finderDirectory)
+            if let screen = NSScreen.main {
+                var frame = window.frame
+                frame.origin.x = max(screen.visibleFrame.minX + 20, screen.visibleFrame.maxX - frame.width - 24)
+                window.setFrame(frame, display: false)
+            }
+        }
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.runModal(for: window)
         window.orderOut(nil)

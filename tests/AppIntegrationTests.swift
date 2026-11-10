@@ -30,6 +30,17 @@ struct AppIntegrationTests {
                      "Setup exposed controls before initialization")
         precondition(setupMenu.items.contains(where: { $0.keyEquivalent == "q" }), "Setup has no normal Quit")
 
+        let menuProbe = App()
+        let menu = menuProbe.makeStatusMenu()
+        let titles = menu.items.map(\.title)
+        let moveIndex = titles.firstIndex(of: "Move window")!
+        precondition(titles[moveIndex + 1] == "Allowed apps…" && titles[moveIndex + 2] == "Allowed videos…")
+        precondition(menu.items[moveIndex + 1].action == #selector(App.openAllowedApps))
+        precondition(menu.items[moveIndex + 2].action == #selector(App.openAllowedVideos))
+        precondition(SettingsSection.apps.finderDirectory.path == "/Applications")
+        precondition(SettingsSection.videos.finderDirectory.isFileURL)
+        print("PASS settings shortcuts: menu placement, section routing and Finder directories")
+
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
         defer { NSStatusBar.system.removeStatusItem(item) }

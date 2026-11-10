@@ -117,7 +117,14 @@ import CryptoKit
         rejected = false
         do { _ = try PhoneBridge.open(PhoneBridge.Vault(salt: first.salt, sealed: tampered), password: password) } catch { rejected = true }
         precondition(rejected)
-        print("PASS encryption: round trip, randomized ciphertext, wrong password, tampering")
+        let migrated = try PhoneBridge.seal("1234", password: password, keyContext: Data("previous-product-context".utf8))
+        let migratedRoundTrip = try JSONDecoder().decode(PhoneBridge.Vault.self, from: JSONEncoder().encode(migrated))
+        let migratedPIN = try PhoneBridge.open(migratedRoundTrip, password: password)
+        precondition(migratedPIN == "1234")
+        rejected = false
+        do { _ = try PhoneBridge.open(PhoneBridge.Vault(salt: migrated.salt, sealed: migrated.sealed), password: password) } catch { rejected = true }
+        precondition(rejected, "A vault accepted a changed KDF context")
+        print("PASS encryption: round trip, randomized ciphertext, wrong password, tampering, migrated vault context")
         let unlockText = ["enter passcode", "enter screen time passcode"]
         precondition(PhoneBridge.isUnlockScreen(unlockText))
         precondition(PhoneBridge.isUnlockScreen(unlockText + ["1 failed passcode attempt"]))

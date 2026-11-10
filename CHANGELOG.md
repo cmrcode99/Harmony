@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased — 1.7.0
+## Unreleased — 1.7.1
 
 Production cleanup for the first public beta. This section describes development changes; it is not a stable-release announcement.
 
 ### Changed
+
+- Added direct Allowed apps and Allowed videos menu shortcuts with Finder, plus encrypted-vault migration metadata.
 
 - Added native drag-and-drop settings for allowed apps and user video playlists, with no rebuild required.
 
