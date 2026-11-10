@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased — 1.7.1
+## Unreleased — 1.7.2
 
 Production cleanup for the first public beta. This section describes development changes; it is not a stable-release announcement.
 
 ### Changed
 
 - Restored the original character icon as the app and repository default.
+
+- Added window-control permission status and an automatic minimization retry after approval.
+- Preserved source video files during library cleanup and made damaged playlists repairable in settings.
+- Preserved an existing signing identity during source updates to avoid unnecessary permission resets.
 
 - Added direct Allowed apps and Allowed videos menu shortcuts with Finder, plus encrypted-vault migration metadata.
 
