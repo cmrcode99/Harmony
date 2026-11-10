@@ -403,7 +403,7 @@ private struct SettingsControlStyle: ViewModifier {
                     .disabled(model.busy || model.libraryNeedsRepair)
             }.padding(.horizontal, 20).padding(.vertical, 14)
         }.frame(minWidth: 740, minHeight: 440).padding(.top, 24)
-            .background(SettingsWindowMaterial())
+            .background(SettingsWindowMaterial().ignoresSafeArea())
     }
 }
 
