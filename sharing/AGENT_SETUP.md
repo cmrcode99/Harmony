@@ -1,15 +1,59 @@
-# Help someone set up Harmony
+# Set up Harmony with your agent
 
-This package is for the Mac architecture shown in its archive name. It includes the app, terminal command, and install/uninstall helpers. No developer tools or Python are required to install it.
+Give your agent the Harmony folder or this repository link, then say:
 
-1. Run `Install Harmony.command`. It installs `~/Applications/Harmony.app`, `~/.local/bin/harmony`, and the per-user recovery service, then opens setup. Existing active or unfinished timed sessions must end before updating.
-2. Help the recipient choose allowed apps and save their generated recovery password privately. Setup itself does not start focus mode.
-3. Help with **System Settings → Privacy & Security → Accessibility**. Verify `~/.local/bin/harmony help`. The installer leaves shell configuration alone; the full command path works immediately.
-4. Start Harmony when the recipient is ready. It force-quits apps outside the allowed list, so save work first. Untimed mode exits with `harmony exit`; timed early exit uses the eye menu and recovery password.
-5. For the optional phone helper, run `Setup iPhone.command` with Harmony off. The recipient supplies their existing Screen Time code and grants Screen Recording access. Test with their device at an empty Screen Time passcode prompt.
+> Help me set up Harmony. Read its AGENT_SETUP.md, handle the computer steps, and explain only what I need to do myself. Get the Mac app working first; ask about the optional phone helper afterward. Keep passwords and passcodes out of chat.
 
-If macOS blocks the locally signed app, let the recipient review and allow the trusted copy in Privacy & Security. Do not disable system security as an installation shortcut.
+## For the agent
 
-Run `Uninstall Harmony.command` or `~/.local/bin/harmony uninstall` to remove the app, command, and service while keeping settings. `--remove-data` explicitly removes local configuration, preferences, and the encrypted phone vault too. Finish a session before uninstalling.
+Guide the user one step at a time. Do routine installation and verification work yourself; don't turn every command into a question. Explain manual actions in plain language and wait when the user needs to use a private prompt or grant a permission.
 
-Settings live in `~/Library/Application Support/Harmony Focus/`. If changing `configuration.json` with Harmony off, keep `approvedPaths` and `approvedBundleIDs` synchronized and preserve `unlockDigest`. The phone vault depends on the existing recovery password. Never copy someone else's settings or put passwords, phone codes, or vaults in chat or source control.
+### 1. Install the Mac app
+
+Choose the route matching the folder you received:
+
+| Folder contains | What to do |
+| --- | --- |
+| `Harmony.app` and `Install Harmony.command` | Run the installer. No compiler or Python is needed. |
+| `setup.sh` and Swift source files | Use an MP4 the user chooses. Run `./setup.sh --check --video /absolute/path/to/video.mp4`, resolve reported prerequisites, then run `./setup.sh --video /absolute/path/to/video.mp4`. Existing playlist media also works with `./setup.sh`. |
+
+If Harmony is already running, finish its session before updating. Installation keeps existing settings and does not start focus mode. Use `~/.local/bin/harmony` directly; editing the user's shell configuration is unnecessary.
+
+### 2. Help the user finish the setup window
+
+Ask which apps they want available during focus time, including their agent and terminal. The user chooses the allowed apps and saves their generated **Harmony recovery password** privately. Never request that password in chat.
+
+Explain: “Harmony closes apps outside your allowed list during focus sessions. Save work before starting.”
+
+Help the user enable Harmony under **System Settings → Privacy & Security → Accessibility**. The user grants the permission. If macOS blocks the downloaded app, explain its approval prompt; do not disable system security.
+
+Verify `~/.local/bin/harmony help`. When the user is ready to try focus mode, use `~/.local/bin/harmony`; exit an untimed session with `~/.local/bin/harmony exit`. Timed early exit uses the eye menu and recovery password. Do not start a timed test as part of installation.
+
+### 3. Offer the phone helper, with “skip for now” as a complete outcome
+
+Ask: “Would you also like help reducing phone distractions? This is optional, and the Mac app works without it.” The phone helper is experimental and needs a supported iPhone Mirroring setup.
+
+If yes, explain the two different credentials:
+
+| Credential | What it does |
+| --- | --- |
+| Harmony recovery password | Unlocks Harmony sessions and the encrypted phone helper. |
+| Screen Time passcode | Controls Apple's restrictions on the iPhone. It is also different from the iPhone unlock passcode. |
+
+Walk the user through choosing Screen Time limits, Downtime, and apps they want to keep available **on their own iPhone**. Keep [Apple's passcode recovery instructions](https://support.apple.com/en-us/102677) available. Then help them connect [iPhone Mirroring](https://support.apple.com/en-us/120421) and verify it works before involving Harmony. Follow the labels on their device; they vary by software version.
+
+With Harmony off, run:
+
+```sh
+~/.local/bin/harmony setup phone
+```
+
+The user enters their Harmony recovery password and existing four-digit Screen Time passcode into the local windows. Harmony stores an encrypted copy on this Mac; it does not create or change Apple's Screen Time settings. Never ask the user to paste either secret into chat or a command.
+
+Help the user grant Screen Recording permission for this optional feature. When they want to test it, have them open iPhone Mirroring at an empty Screen Time passcode prompt, start Harmony, and use `~/.local/bin/harmony phone`. The user enters their Harmony password locally. Stop if the target is not recognized; do not guess codes or repeat phone input.
+
+### 4. Leave a short handoff
+
+Tell the user how to start, exit, and reopen setup. Mention only any unfinished manual step. If they skipped phone setup, the Mac setup is complete.
+
+For later changes, edit allowed-app configuration only with Harmony off, keep `approvedPaths` and `approvedBundleIDs` synchronized, and preserve `unlockDigest`. Settings live in `~/Library/Application Support/Harmony Focus/`. `harmony uninstall` keeps settings; `--remove-data` explicitly deletes them. Do not copy someone else's settings, credentials, or phone vault.

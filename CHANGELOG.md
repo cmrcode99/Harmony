@@ -6,6 +6,8 @@ Production cleanup for the first public beta. This section describes development
 
 ### Changed
 
+- Added a shared agent-led setup guide and `harmony setup phone` for optional phone configuration.
+
 - Split process startup, lifecycle, menus, overlay controls, and video playback into focused Swift files.
 - Made setup preflight read-only and shared installation, update, and uninstall handling.
 - Added uninstall commands that preserve settings unless removal is explicitly requested.

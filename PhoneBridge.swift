@@ -93,7 +93,7 @@ import CoreML
         do {
             try checkAuthorization()
             guard FileManager.default.fileExists(atPath: vaultURL.path) else {
-                await message("Phone code not configured", "The encrypted phone code is missing. No input was sent.")
+                await message("Phone helper not set up", "Finish your current session, then ask your agent to run harmony setup phone. You can keep using Harmony on your Mac without the phone helper. No input was sent.")
                 return
             }
             pin = try Self.open(JSONDecoder().decode(Vault.self, from: PrivateSettingsStore.read(from: vaultURL)), password: password)

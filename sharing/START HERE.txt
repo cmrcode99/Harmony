@@ -1,31 +1,21 @@
-HARMONY — EARLY BETA
+HARMONY — START WITH YOUR AGENT
 
-1. Unzip the package and run Install Harmony.command.
-2. Choose the apps you want available and save your generated recovery password.
-3. Enable Harmony in System Settings > Privacy & Security > Accessibility.
-4. When ready, open Harmony or run ~/.local/bin/harmony.
+Give your agent this folder and say:
 
-Harmony force-quits apps outside your allowed list. Save work first.
-Setup does not start focus mode. During a timed session, early exit uses the
-eye menu and recovery password. Pausing or hiding video does not pause the timer.
+“Help me set up Harmony. Read AGENT_SETUP.md and handle the computer steps.
+Explain what I need to do myself. Set up the Mac first, and ask about the
+optional phone helper afterward.”
 
-Run ~/.local/bin/harmony help for commands. If you want to use just "harmony",
-add ~/.local/bin to your shell PATH; the installer does not change your shell files.
+You choose which apps stay available, save your Harmony recovery password,
+and approve macOS permissions. Enter passwords only in the app's local
+windows, never in chat.
 
-OPTIONAL IPHONE HELPER
-Configure Screen Time and iPhone Mirroring, then run Setup iPhone.command
-with Harmony off. Enter your existing Screen Time code. Screen Recording
-permission is required. The helper stores an encrypted copy of the code locally.
+Harmony closes apps outside your allowed list during focus sessions.
+Save work before starting. Installation itself does not start focus mode.
 
-UPDATE OR UNINSTALL
-End the current session and exit before installing an update. Settings are kept.
-Run Uninstall Harmony.command to remove the app, command, and recovery service.
-Settings and the encrypted phone vault stay on this Mac by default. Add
---remove-data only when you want those deleted as well.
+Setting up without an agent? Run Install Harmony.command, finish the setup
+window, and enable Accessibility for Harmony in System Settings. The phone
+helper is optional; you can skip it and use the Mac app normally.
 
-The app requires macOS 13 or later and the architecture shown in the ZIP name.
-No developer tools or Python are needed to install this package. It is locally
-signed, not Apple-notarized, so macOS may ask you to allow it in Privacy & Security.
-Real-device permission, recovery, and phone flows still need beta testing.
-
-If an agent is helping you, give it AGENT_SETUP.md from this folder.
+This is an early beta, locally signed and not Apple-notarized. The package
+requires macOS 13 or later and the architecture shown in its ZIP name.

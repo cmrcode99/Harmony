@@ -1,11 +1,8 @@
 # Working on Harmony
 
-## Setup and local use
+## Helping a user install or configure Harmony
 
-- Read README.md. Use `./setup.sh --check --video /absolute/path/to/video.mp4` for a read-only preflight, then `./setup.sh --video /absolute/path/to/video.mp4` to install. Existing playlist media also works with `./setup.sh`. `--no-open` skips the configuration window.
-- Setup does not start focus restrictions. Help the user choose allowed apps and save their generated recovery password privately. Use `~/.local/bin/harmony help` without changing shell configuration.
-- Starting focus mode force-quits unapproved apps. Only start when the user wants that behavior. End an active session through the app before updating or uninstalling it.
-- `harmony uninstall` and `./uninstall.sh` preserve local settings. `--remove-data` is an explicit request to delete configuration and the encrypted vault.
+Read [sharing/AGENT_SETUP.md](sharing/AGENT_SETUP.md) first. It is the common guide for source checkouts and prebuilt packages. Handle routine computer steps yourself, explain the user's manual actions one at a time, and finish Mac setup before offering optional phone setup. Do not ask for credentials in chat or start a focus session unexpectedly.
 
 ## Changes and checks
 

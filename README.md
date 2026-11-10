@@ -8,7 +8,15 @@ A native macOS focus app with an offline floating video player, timed sessions, 
 
 **Early beta.** Harmony is ready for testing and contributions. Installation, permissions, and recovery still need real-device testing across supported Macs.
 
-## Start here
+## Set up with your agent
+
+Give your agent this repository or the downloaded Harmony folder and say:
+
+> Help me set up Harmony. Read [the setup guide](sharing/AGENT_SETUP.md), handle the computer steps, and explain what I need to do myself. Get the Mac app working first; ask about the optional phone helper afterward.
+
+Your agent handles installation and verification. You choose your allowed apps, save your recovery password, and approve macOS permissions. Enter passwords in the app's local windows, never in chat. Phone setup is optional.
+
+## Set up yourself
 
 | | Requirements |
 | --- | --- |
@@ -52,6 +60,7 @@ Add `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration if you wa
 | `harmony hide` / `harmony unhide` | Hide or show the video; keep the session running. |
 | `harmony exit` | Exit untimed mode. Timed early exit uses the eye menu and recovery password. |
 | `harmony setup` | Open first-run configuration while the app is off. |
+| `harmony setup phone` | Configure the optional phone helper while the app is off. |
 | `harmony phone` | Verify your password and enter the saved phone code. |
 
 Durations range from one minute to five hours. Repeating a start command leaves an existing session unchanged. Time asleep counts toward the deadline; an unfinished timed session can recover after a crash or login. Harmony is a personal focus aid. It does not filter websites or commands inside allowed apps or provide an administrator-enforced lock.
@@ -72,9 +81,11 @@ Uninstall keeps settings and the encrypted phone vault. Add `--remove-data` to e
 
 ## Optional iPhone helper
 
-Configure Screen Time and iPhone Mirroring on your devices first. With Harmony off, run `sharing/Setup iPhone.command`, enter your Harmony recovery password, then your existing four-digit Screen Time code. The helper stores an encrypted copy locally; it does not change the phone's code.
+The Mac app works without phone setup. If you want it, ask your agent to follow [the phone setup steps](sharing/AGENT_SETUP.md#3-offer-the-phone-helper-with-skip-for-now-as-a-complete-outcome).
 
-Enable Screen Recording for Harmony, open Mirroring at an empty Screen Time passcode prompt, then run `harmony phone`. The helper checks the screen before every digit and stops when it cannot verify the target. Reconfigure it after changing the phone code or Harmony password.
+You choose Screen Time limits on your iPhone and connect iPhone Mirroring first. Then, with Harmony off, run `harmony setup phone`. Enter your **Harmony recovery password** and your existing **Screen Time passcode** in the local windows. These are different credentials. Harmony keeps an encrypted copy of the phone code; it does not change Screen Time settings.
+
+Screen Recording permission is needed for this experimental helper. To use it, open Mirroring at an empty Screen Time passcode prompt and run `harmony phone` during a Harmony session. Reconfigure it after changing either credential.
 
 ## Development
 
