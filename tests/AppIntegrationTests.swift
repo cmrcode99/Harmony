@@ -43,6 +43,7 @@ struct AppIntegrationTests {
         print("PASS settings shortcuts: menu placement, section routing and Finder directories")
         testWindowControlPermissions(menuProbe)
         testTimedSettingsLock()
+        testBundledAppApproval()
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -111,6 +112,28 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    private static func testBundledAppApproval() {
+        do {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("harmony-approval-" + UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let docker = root.appendingPathComponent("Docker.app")
+            let desktop = docker.appendingPathComponent("Contents/MacOS/Docker Desktop.app")
+            let unrelated = root.appendingPathComponent("Docker.app-other/Outside.app")
+            try FileManager.default.createDirectory(at: desktop, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
+            let policy = AppApprovalPolicy(approvedPaths: [docker.path], bundleIDs: ["com.docker.docker"])
+            precondition(policy.allows(bundleIdentifier: "com.docker.docker", bundleURL: docker))
+            precondition(policy.allows(bundleIdentifier: "com.electron.dockerdesktop", bundleURL: desktop), "Approved app's bundled UI was blocked")
+            precondition(!policy.allows(bundleIdentifier: "com.docker.unrelated", bundleURL: unrelated), "Similar names granted access to an outside app")
+            let link = docker.appendingPathComponent("Contents/Outside.app")
+            try FileManager.default.createSymbolicLink(at: link, withDestinationURL: unrelated)
+            precondition(!policy.allows(bundleIdentifier: "outside", bundleURL: link), "A symlink escaped the approved bundle")
+            let revoked = AppApprovalPolicy(approvedPaths: [], bundleIDs: [])
+            precondition(!revoked.allows(bundleIdentifier: "com.electron.dockerdesktop", bundleURL: desktop), "Removing the parent left its helper approved")
+            print("PASS app approval: bundled helpers, path boundaries, symlink rejection and parent removal")
+        } catch { preconditionFailure("App approval fixture failed: \(error)") }
     }
 
     @MainActor private static func testTimedSettingsLock() {
