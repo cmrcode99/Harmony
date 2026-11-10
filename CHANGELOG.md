@@ -1,10 +1,19 @@
 # Changelog
 
-## Unreleased — 1.7.1
+## Unreleased — 1.7.2
 
 Production cleanup for the first public beta. This section describes development changes; it is not a stable-release announcement.
 
 ### Changed
+
+- Restored the original character icon as the app and repository default.
+
+- Redesigned settings with native Liquid Glass, separate app/video views, and shorter menu labels.
+- Focused platform support and automated checks on Apple Silicon Macs.
+
+- Added window-control permission status and an automatic minimization retry after approval.
+- Preserved source video files during library cleanup and made damaged playlists repairable in settings.
+- Preserved an existing signing identity during source updates to avoid unnecessary permission resets.
 
 - Added direct Allowed apps and Allowed videos menu shortcuts with Finder, plus encrypted-vault migration metadata.
 
@@ -17,7 +26,7 @@ Production cleanup for the first public beta. This section describes development
 - Added uninstall commands that preserve settings unless removal is explicitly requested.
 - Tightened configuration validation and private storage while retaining existing data formats.
 - Prevented child executables from inheriting the app's singleton lock.
-- Added an MIT license, original icon artwork, and clearer setup, contribution, security, and release guidance.
+- Added an MIT license, the original character icon, and clearer setup, contribution, security, and release guidance.
 
 ### Verification
 

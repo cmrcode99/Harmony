@@ -16,7 +16,7 @@ final class HarmonyStatusMenuState: ObservableObject {
     var perform: (Int) -> Void = { _ in }
 
     func update(from menu: NSMenu) {
-        let next = menu.items.enumerated().map { index, item in
+        let next = menu.items.enumerated().filter { !$0.element.isHidden }.map { index, item in
             Entry(id: index, title: item.title, enabled: item.isEnabled,
                   separator: item.isSeparatorItem, toggle: item.identifier?.rawValue == "mute",
                   checked: item.state == .on)

@@ -18,11 +18,11 @@ Record the macOS version, Mac architecture, commit, and scenarios tested in the 
 make share
 ```
 
-This creates a local ZIP and SHA-256 checksum in `dist/`; it does not upload anything. `HARMONY_ARCH=arm64` or `HARMONY_ARCH=x86_64` selects an architecture. The default is the current Mac. Use the package matching the recipient's Mac and verify the checksum from the directory containing the archive.
+This creates a local ZIP and SHA-256 checksum in `dist/`; it does not upload anything. Apple Silicon is the supported and tested target. Build on an Apple Silicon Mac (or set `HARMONY_ARCH=arm64`) and verify the checksum from the directory containing the archive.
 
-The default eye icon is generated from `tools/make-icon.swift`; the SVG mark is in `assets/harmony-mark.svg`. To use your own redistributable icon, set `HARMONY_ICON=/absolute/path/to/custom.icns`.
+The default application icon is bundled at `assets/Harmony.icns`; `assets/Harmony.png` is its documentation preview. To use your own redistributable icon, set `HARMONY_ICON=/absolute/path/to/custom.icns`.
 
-`HARMONY_SIGN_IDENTITY` selects an existing code-signing identity. Local ad-hoc signing is the default; it is not notarization. Keep signing credentials outside the repository. Distribution signing and Apple notarization need a separately configured release process; do not claim them until the resulting artifact is verified.
+`HARMONY_SIGN_IDENTITY` selects an existing code-signing identity. New installations and staged builds use ad-hoc signing by default. Source updates reuse the installed app’s certificate when its signing identity is available in the current keychain search list. If it is unavailable, the build stops before replacement: unlock that keychain or explicitly select an identity. Set `HARMONY_SIGN_IDENTITY=-` to deliberately switch to ad-hoc signing; macOS permissions may need approval again. The build does not create certificates or change keychain trust. Signing is not notarization. Keep signing credentials outside the repository. Distribution signing and Apple notarization need a separately configured release process; do not claim them until the resulting artifact is verified.
 
 ## Publish
 

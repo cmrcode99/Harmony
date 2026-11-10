@@ -47,6 +47,8 @@ Explain the problem, the resulting behavior, and the checks you ran. Include a r
 Preserve these behaviors unless the change explicitly proposes otherwise:
 
 - Setup, update, and uninstall do not start a focus session.
+- Focus startup prepares allowed windows once; allowed cmux stays visible, and activating an allowed app cancels its pending minimization.
+- Settings pause untimed focus and resume it on close; timed sessions keep settings locked.
 - Timed sessions cannot be shortened or bypassed through ordinary CLI exit.
 - Hiding or pausing video leaves the session deadline intact.
 - Phone input stops on an unverified screen or cancelled authorization.

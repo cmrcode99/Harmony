@@ -9,6 +9,7 @@ __pycache__/
 *.zip.sha256
 *.mp4
 *.icns
+!assets/Harmony.icns
 *.keychain*
 .env
 .env.*

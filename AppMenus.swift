@@ -11,8 +11,10 @@ extension App {
         muteItem = add(menu, "Unmute", #selector(sound))
         muteItem.identifier = NSUserInterfaceItemIdentifier("mute")
         moveItem = add(menu, "Move window", #selector(toggleWindowMovement))
-        settingsItem = add(menu, "Allowed apps…", #selector(openAllowedApps))
-        videoSettingsItem = add(menu, "Allowed videos…", #selector(openAllowedVideos))
+        settingsItem = add(menu, "Allowed apps", #selector(openAllowedApps))
+        videoSettingsItem = add(menu, "Allowed videos", #selector(openAllowedVideos))
+        windowControlItem = add(menu, "Enable window control", #selector(openWindowControlSettings))
+        updateWindowControlMenuItems(granted: checkWindowControlPermission())
         menu.addItem(.separator())
         add(menu, "Small", #selector(small))
         add(menu, "Medium", #selector(medium))
@@ -55,9 +57,11 @@ extension App {
         applicationItem.submenu = applicationMenu
         let about = NSMenuItem(title: "About Harmony", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         applicationMenu.addItem(about)
-        let settings = add(applicationMenu, "Apps and videos…", #selector(openSettings), ",")
+        let settings = add(applicationMenu, "Apps and videos", #selector(openSettings), ",")
         settings.isEnabled = uiReady && !isLocked
         applicationSettingsItem = settings
+        applicationWindowControlItem = add(applicationMenu, "Enable window control", #selector(openWindowControlSettings))
+        updateWindowControlMenuItems(granted: checkWindowControlPermission())
         applicationMenu.addItem(.separator())
         let hide = add(applicationMenu, "Hide Harmony", #selector(hideFromApplicationMenu), "h")
         hide.isEnabled = uiReady
@@ -104,7 +108,7 @@ extension App {
         tickLock()
         guard statusMenu.items.indices.contains(index) else { return }
         let item = statusMenu.items[index]
-        guard item.isEnabled, let action = item.action else { return }
+        guard item.isEnabled, !item.isHidden, let action = item.action else { return }
         NSApp.sendAction(action, to: item.target, from: item)
     }
 }

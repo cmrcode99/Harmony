@@ -14,6 +14,13 @@ if (( ! stage_only )) && pgrep -u "$(id -u)" -x HarmonyFocus >/dev/null; then
   print -u2 'Exit Harmony before building. An active lock must be unlocked normally.'
   exit 1
 fi
+# Preserve an existing certificate identity on source updates so an ordinary
+# rebuild does not silently replace it with an ad-hoc signature.
+if (( stage_only )); then
+  SIGN_IDENTITY=$(python3 tools/select-signing-identity.py)
+else
+  SIGN_IDENTITY=$(python3 tools/select-signing-identity.py "$DEST")
+fi
 if (( stage_only )); then
   STAGE=$(mktemp -d "${TMPDIR:-/tmp}/harmony-build.XXXXXX")
 else
@@ -31,10 +38,10 @@ if [[ -n "${HARMONY_ICON:-}" ]]; then
   [[ -f "$HARMONY_ICON" ]] || { print -u2 'HARMONY_ICON must point to an .icns file.'; exit 1; }
   cp "$HARMONY_ICON" "$APP/Contents/Resources/Harmony.icns"
 else
-  swift tools/make-icon.swift "$APP/Contents/Resources/Harmony.icns"
+  cp assets/Harmony.icns "$APP/Contents/Resources/Harmony.icns"
 fi
 /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string Harmony' "$APP/Contents/Info.plist"
-codesign --force --sign "${HARMONY_SIGN_IDENTITY:--}" "$APP"
+codesign --force --sign "$SIGN_IDENTITY" "$APP"
 codesign --verify --deep --strict "$APP"
 if (( stage_only )); then
   mkdir -p "${DEST:h}"

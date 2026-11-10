@@ -64,7 +64,13 @@ struct VideoLibrary: Sendable {
         guard ownsClipsDirectory else { return }
         let keep = Set(videos.map(\.file))
         for file in (try? FileManager.default.contentsOfDirectory(at: clips, includingPropertiesForKeys: nil)) ?? [] {
-            if file.lastPathComponent.hasPrefix("clip-") && !keep.contains(file.lastPathComponent) {
+            // Only the UUID-named regular files created by importVideo belong
+            // to us. Never recursively remove an unknown file or directory.
+            let stem = file.deletingPathExtension().lastPathComponent
+            let imported = stem.hasPrefix("clip-") && UUID(uuidString: String(stem.dropFirst(5))) != nil &&
+                Self.extensions.contains(file.pathExtension.lowercased()) &&
+                (try? FileManager.default.attributesOfItem(atPath: file.path)[.type] as? FileAttributeType) == .typeRegular
+            if imported && !keep.contains(file.lastPathComponent) {
                 try? FileManager.default.removeItem(at: file)
             }
         }

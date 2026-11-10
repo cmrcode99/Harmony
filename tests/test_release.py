@@ -64,6 +64,18 @@ class ReleaseTests(unittest.TestCase):
         subprocess.run(['git', '-C', str(self.package), 'add', '-f', 'dist/configuration.json'], check=True)
         self.assertEqual(release.check(self.package), ['dist: generated metadata is tracked in source'])
 
+    def test_shipped_icon_is_allowed_without_allowing_other_media(self):
+        subprocess.run(['git', 'init', '-q', str(self.package)], check=True)
+        assets = self.package / 'assets'
+        assets.mkdir()
+        for name in ['Harmony.icns', 'extra.icns', 'video.mp4']:
+            (assets / name).write_bytes(b'fixture')
+        subprocess.run(['git', '-C', str(self.package), 'add', 'assets'], check=True)
+        problems = release.check(self.package)
+        self.assertEqual(problems, [
+            'assets/extra.icns: media asset is tracked in source',
+            'assets/video.mp4: media asset is tracked in source'])
+
     def test_private_types_are_rejected_but_example_env_is_allowed(self):
         for name in ['.env', '.env.local', 'key.pem', 'identity.p12', 'signing.keychain-db']:
             (self.package / name).write_text('placeholder')
