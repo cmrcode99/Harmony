@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — 1.7.6
+## Unreleased — 1.7.7
+
+- Use native tab buttons that accept the first click when settings are inactive, instead of relying on sidebar list selection.
+
+## 1.7.6
 
 - Use normal settings windows instead of nested modal loops so lists, tabs, Save, Cancel, and repeated reopening remain responsive.
 - Keep native lists on standard translucent material while retaining glass controls.

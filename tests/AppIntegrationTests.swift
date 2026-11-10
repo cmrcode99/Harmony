@@ -45,6 +45,7 @@ struct AppIntegrationTests {
         testTimedSettingsLock()
         testBundledAppApproval()
         testSettingsWindowCompletions()
+        testSettingsTabClicks()
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -113,6 +114,17 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testSettingsTabClicks() {
+        let button = SettingsNavigationButton(frame: .zero)
+        var clicks = 0
+        button.onSelect = { clicks += 1 }
+        precondition(button.acceptsFirstMouse(for: nil), "An inactive settings tab consumed its first click")
+        button.performClick(nil)
+        button.performClick(nil)
+        precondition(clicks == 2 && button.state == .on, "Tab buttons failed to select or toggled off")
+        print("PASS settings tabs: first-click activation and repeated native button dispatch")
     }
 
     @MainActor private static func testSettingsWindowCompletions() {
