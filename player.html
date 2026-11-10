@@ -1,12 +1,42 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harmony</title>
-<style>html,body{margin:0;background:black;overflow:hidden}#movie_player,video{position:absolute;inset:0;width:100%;height:100%}video{object-fit:contain;cursor:pointer}#player-status{position:absolute;inset:0;display:grid;place-content:center;padding:16px;color:white;text-align:center;font:13px system-ui;background:#111}#player-status[hidden]{display:none}</style>
-</head><body><div id="movie_player"><video muted playsinline preload="metadata" tabindex="0" role="button" aria-label="Pause video"></video><div id="player-status" role="status" hidden></div></div>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Harmony</title>
+  <style>
+    html, body { margin: 0; background: black; overflow: hidden; }
+    #movie_player, video { position: absolute; inset: 0; width: 100%; height: 100%; }
+    video { object-fit: contain; cursor: pointer; }
+    #player-status {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      padding: 16px;
+      color: white;
+      text-align: center;
+      font: 13px system-ui;
+      background: #111;
+    }
+    #player-status[hidden] { display: none; }
+  </style>
+</head>
+<body>
+<div id="movie_player">
+  <video muted playsinline preload="metadata" tabindex="0" role="button" aria-label="Pause video"></video>
+  <div id="player-status" role="status" hidden></div>
+</div>
 <script src="playlist.js"></script>
 <script>
 const video = document.querySelector('video');
 const status = document.querySelector('#player-status');
-const playlist = window.harmonyPlaylist;
+// A missing or damaged playlist must leave a visible recovery message, not a blank panel.
+const playlist = Array.isArray(window.harmonyPlaylist) ? window.harmonyPlaylist.filter(entry => {
+  if (!entry || typeof entry.file !== 'string' || !entry.file || typeof entry.title !== 'string') return false;
+  if (entry.file.startsWith('/') || entry.file.split('/').includes('..')) return false;
+  return entry.startSeconds === undefined || (Number.isFinite(entry.startSeconds) && entry.startSeconds >= 0);
+}) : [];
 const failedTracks = new Set();
 let trackIndex = 0;
 window.harmonyTrackIndex = trackIndex;
@@ -18,7 +48,7 @@ let ready = false;
 let unavailable = false;
 let prepared = false;
 function clipStart() { return playlist[trackIndex].startSeconds || 0; }
-window.harmonyPlaybackSnapshot = () => prepared && Number.isFinite(video.duration) ? [Math.max(0, video.currentTime - clipStart()), video.duration - clipStart(), trackIndex, revision] : null;
+window.harmonyPlaybackSnapshot = () => prepared && !unavailable && Number.isFinite(video.duration) ? [Math.max(0, video.currentTime - clipStart()), video.duration - clipStart(), trackIndex, revision] : null;
 window.harmonySeekPlayback = (position, expectedTrack) => {
   if (!prepared || expectedTrack !== trackIndex || !Number.isFinite(position)) return;
   video.currentTime = clipStart() + Math.min(video.duration - clipStart(), Math.max(0, position));
@@ -28,14 +58,27 @@ function notifyState(trackChanged = false) {
   if (trackChanged) state.index = trackIndex;
   window.webkit.messageHandlers.togglePlayback.postMessage(state);
 }
+function showUnavailable(message) {
+  unavailable = true;
+  prepared = false;
+  video.pause();
+  video.style.visibility = 'hidden';
+  status.textContent = message;
+  status.hidden = false;
+}
 function loadTrack(index, notify = true) {
+  if (playlist.length === 0) {
+    showUnavailable('No videos are configured. Add a local MP4 and rebuild Harmony.');
+    return;
+  }
   trackIndex = Number.isInteger(index) && index >= 0 && index < playlist.length ? index : 0;
   window.harmonyTrackIndex = trackIndex;
   unavailable = false;
   prepared = false;
   status.hidden = true;
   video.style.visibility = 'hidden';
-  video.src = playlist[trackIndex].file;
+  // Encode names as path segments so #, ?, %, and : remain part of local filenames.
+  video.src = playlist[trackIndex].file.split('/').map(encodeURIComponent).join('/');
   video.setAttribute('title', playlist[trackIndex].title);
   video.load();
   if (notify) {
@@ -49,13 +92,10 @@ function advanceAvailable() {
     const next = (trackIndex + step) % playlist.length;
     if (!failedTracks.has(next)) { loadTrack(next); return; }
   }
-  unavailable = true;
-  video.pause();
-  status.textContent = 'Videos could not be loaded. Try Skip or Reload video from the eye menu.';
-  status.hidden = false;
+  showUnavailable('Videos could not be loaded. Try Skip or Reload video from the eye menu.');
 }
 window.harmonySkipVideo = (steps = 1) => {
-  if (!ready || !Number.isSafeInteger(steps) || steps <= 0) return;
+  if (!ready || playlist.length === 0 || !Number.isSafeInteger(steps) || steps <= 0) return;
   failedTracks.clear();
   loadTrack((trackIndex + steps % playlist.length) % playlist.length);
 };
@@ -80,7 +120,7 @@ window.harmonyApplyPlayback = (paused, acknowledgedRevision, isVisible, pageGene
   else applyPlayback();
 };
 function togglePlayback() {
-  if (!ready) return;
+  if (!ready || unavailable) return;
   pausedByUser = !pausedByUser;
   revision += 1;
   applyPlayback(); // Immediate response, before crossing the process boundary.
@@ -92,7 +132,7 @@ function rejectTrack() {
   advanceAvailable();
 }
 video.addEventListener('loadedmetadata', () => {
-  if (!ready || prepared) return;
+  if (!ready || prepared || unavailable) return;
   if (!Number.isFinite(video.duration) || video.duration <= clipStart()) { rejectTrack(); return; }
   if (clipStart() > 0) {
     try { video.currentTime = clipStart(); } catch (_) { rejectTrack(); }
@@ -109,7 +149,7 @@ video.addEventListener('seeked', () => {
     applyPlayback();
   }
 });
-video.addEventListener('ended', () => { if (ready) advanceAvailable(); });
+video.addEventListener('ended', () => { if (ready && prepared && !unavailable) advanceAvailable(); });
 video.addEventListener('error', rejectTrack);
 video.addEventListener('pointerdown', event => {
   if (event.button === 0 && event.isPrimary !== false) togglePlayback();
@@ -123,4 +163,6 @@ video.addEventListener('keydown', event => {
     togglePlayback();
   }
 });
-</script></body></html>
+</script>
+</body>
+</html>

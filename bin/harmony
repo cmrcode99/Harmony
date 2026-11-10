@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -eu
 app="$HOME/Applications/Harmony.app"
-usage='Usage: harmony [HOURS [MINUTES]|hide|unhide|exit|phone|setup|help] | harmony extend HOURS [MINUTES]'
+usage='Usage: harmony [HOURS [MINUTES]|hide|unhide|exit|phone|setup|uninstall|help] | harmony extend HOURS [MINUTES]'
 if (( $# > 3 )); then print -u2 "$usage"; exit 2; fi
 action=show
 hours=''
@@ -36,6 +36,11 @@ case "${1-}" in
       exit 2
     fi
     action=extend ;;
+  uninstall)
+    if (( $# > 2 )) || [[ -n "${2-}" && "$2" != --remove-data ]]; then print -u2 "$usage"; exit 2; fi
+    manager="$HOME/.local/lib/harmony/manage-install.sh"
+    [[ -f "$manager" ]] || { print -u2 'The uninstall helper is missing. Run uninstall.sh from the source folder or Uninstall Harmony.command from your package.'; exit 1; }
+    exec /bin/zsh "$manager" uninstall "${@:2}" ;;
   setup)
     if (( $# != 1 )); then print -u2 "$usage"; exit 2; fi
     action=setup ;;
@@ -44,7 +49,7 @@ case "${1-}" in
     action="$1" ;;
   help|--help|-h)
     if (( $# != 1 )); then print -u2 "$usage"; exit 2; fi
-    print 'harmony              Start Harmony and prepare approved apps\nharmony 1..5         Start a whole-hour timed session\nharmony H M          Start H hours M minutes (e.g. 2 30 or 0 45)\nharmony extend N [M] Set an active timer to N hours M minutes remaining\nharmony hide         Hide eye and silence audio; keep restrictions/timer\nharmony unhide       Show eye again without changing the timer\nharmony phone        Verify long password and type Screen Time code\nharmony exit         Exit base mode; timed sessions exit through the eye menu\nharmony setup        Open first-run setup while off\nharmony help         Show this help (also --help or -h)\n\nMinutes must be 0–59. Total duration: 1 minute to 5 hours; 5 0 is valid, 5 1 is not. Hours alone must be 1–5. Extend uses a target from now; it does not add time, shorten, start or revive a session. Start commands refuse an already-running instance. Use unhide to reveal a hidden eye.'
+    print 'harmony              Start Harmony and prepare approved apps\nharmony 1..5         Start a whole-hour timed session\nharmony H M          Start H hours M minutes (e.g. 2 30 or 0 45)\nharmony extend N [M] Set an active timer to N hours M minutes remaining\nharmony hide         Hide eye and silence audio; keep restrictions/timer\nharmony unhide       Show eye again without changing the timer\nharmony phone        Verify long password and type Screen Time code\nharmony exit         Exit base mode; timed sessions exit through the eye menu\nharmony setup        Open first-run setup while off\nharmony uninstall    Remove the app and command; keep saved settings\nharmony uninstall --remove-data  Also remove saved settings and phone vault\nharmony help         Show this help (also --help or -h)\n\nMinutes must be 0–59. Total duration: 1 minute to 5 hours; 5 0 is valid, 5 1 is not. Hours alone must be 1–5. Extend uses a target from now; it does not add time, shorten, start or revive a session. Start commands refuse an already-running instance. Use unhide to reveal a hidden eye.'
     exit 0 ;;
   *) print -u2 "$usage"; exit 2 ;;
 esac

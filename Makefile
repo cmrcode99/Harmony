@@ -1,8 +1,7 @@
 .PHONY: check test build setup share
 check test:
-	python3 tests/test_resources.py
+	python3 -m unittest discover -s tests -p 'test_*.py'
 	./tests/run-all-tests.sh
-	./tests/run-setup-tests.sh
 	python3 tools/check-release.py .
 build:
 	./build.sh

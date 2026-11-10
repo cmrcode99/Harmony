@@ -1,20 +1,31 @@
-HARMONY
+HARMONY — EARLY BETA
 
-1. Run Install Harmony.command to install the app and terminal command.
-2. Choose your allowed apps and save your generated recovery password.
-3. Enable Harmony under System Settings > Privacy & Security > Accessibility.
+1. Unzip the package and run Install Harmony.command.
+2. Choose the apps you want available and save your generated recovery password.
+3. Enable Harmony in System Settings > Privacy & Security > Accessibility.
 4. When ready, open Harmony or run ~/.local/bin/harmony.
 
-Focus mode force-quits apps outside your chosen list. Save work first.
-Setup itself does not start focus mode. Timed early exit uses the eye menu
-and your recovery password. Run ~/.local/bin/harmony help for commands.
+Harmony force-quits apps outside your allowed list. Save work first.
+Setup does not start focus mode. During a timed session, early exit uses the
+eye menu and recovery password. Pausing or hiding video does not pause the timer.
 
-For the optional iPhone helper, configure Screen Time and iPhone Mirroring,
-then run Setup iPhone.command while Harmony is off. Enter your existing
-Screen Time code. Screen Recording permission is required for this helper.
+Run ~/.local/bin/harmony help for commands. If you want to use just "harmony",
+add ~/.local/bin to your shell PATH; the installer does not change your shell files.
 
-This is a locally signed app, not Apple-notarized. macOS may require you to
-allow it in Privacy & Security. No administrator password is needed by the
-installer. The package supports the Mac architecture shown in its ZIP name.
+OPTIONAL IPHONE HELPER
+Configure Screen Time and iPhone Mirroring, then run Setup iPhone.command
+with Harmony off. Enter your existing Screen Time code. Screen Recording
+permission is required. The helper stores an encrypted copy of the code locally.
 
-If an agent is helping you, give it AGENT_SETUP.md.
+UPDATE OR UNINSTALL
+End the current session and exit before installing an update. Settings are kept.
+Run Uninstall Harmony.command to remove the app, command, and recovery service.
+Settings and the encrypted phone vault stay on this Mac by default. Add
+--remove-data only when you want those deleted as well.
+
+The app requires macOS 13 or later and the architecture shown in the ZIP name.
+No developer tools or Python are needed to install this package. It is locally
+signed, not Apple-notarized, so macOS may ask you to allow it in Privacy & Security.
+Real-device permission, recovery, and phone flows still need beta testing.
+
+If an agent is helping you, give it AGENT_SETUP.md from this folder.

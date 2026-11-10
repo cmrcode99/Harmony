@@ -37,8 +37,8 @@ try:
                     CFBundleName='Harmony UI Test', CFBundleDisplayName='Harmony UI Test')
         (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
         subprocess.run([sys.executable, str(ROOT / 'tools/copy-player-resources.py'), str(resources)], check=True)
-        sources = ['main.swift', 'Setup.swift', 'PhoneBridge.swift', 'PhonePrompt.swift', 'WindowPreparation.swift',
-                   'WindowRedraw.swift', 'NativeInterface.swift', 'LifecycleCore.swift', 'tests/AppIntegrationTests.swift']
+        sources = [str(path.relative_to(ROOT)) for path in sorted(ROOT.glob('*.swift'))]
+        sources.append('tests/AppIntegrationTests.swift')
         command = ['swiftc', '-O', '-whole-module-optimization', '-D', 'HARMONY_TESTING',
                    '-target', f'{platform.machine()}-apple-macosx13.0', *sources, '-o', str(executable)]
         for framework in ('Cocoa', 'WebKit', 'Vision', 'ScreenCaptureKit', 'ApplicationServices'):

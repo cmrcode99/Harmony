@@ -55,7 +55,8 @@ class ResourceTests(unittest.TestCase):
         for entry in [{'file': '../outside.mp4', 'title': 'bad'},
                       {'file': '/tmp/outside.mp4', 'title': 'bad'},
                       {'file': 'video.mp4', 'title': 'bad', 'startSeconds': -1},
-                      {'file': 'video.mp4', 'title': 'bad', 'startSeconds': True}]:
+                      {'file': 'video.mp4', 'title': 'bad', 'startSeconds': True},
+                      {'file': 'video.mp4', 'title': 'bad', 'startSeconds': 10**1000}]:
             with self.subTest(entry=entry):
                 self.entries = [entry]
                 self.save()
@@ -66,7 +67,45 @@ class ResourceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             resources.available_playlist(self.root)
 
-    def test_setup_check_is_read_only_and_custom_video_has_no_intro_trim(self):
+    def test_equivalent_paths_and_aliases_cannot_duplicate_a_video(self):
+        video = self.root / 'video.mp4'
+        video.write_bytes(b'local fixture')
+        for alias in ['./video.mp4', 'media/alias.mp4']:
+            with self.subTest(alias=alias):
+                if alias.startswith('media/'):
+                    (self.root / alias).symlink_to(video)
+                self.entries = [{'file': 'video.mp4', 'title': 'one'}, {'file': alias, 'title': 'two'}]
+                self.save()
+                with self.assertRaisesRegex(ValueError, 'Duplicate'):
+                    resources.available_playlist(self.root)
+
+    def test_resource_copy_normalizes_paths_without_losing_special_filenames(self):
+        name = 'focus #1?100%:ready.mp4'
+        (self.root / name).write_bytes(b'local fixture')
+        self.entries = [{'file': './' + name, 'title': 'Special name'}]
+        self.save()
+        target = self.root / 'output'
+        resources.copy_resources(target, self.root)
+        self.assertEqual((target / name).read_bytes(), b'local fixture')
+        bundled = (target / 'playlist.js').read_text()
+        self.assertIn(name, bundled)
+        self.assertNotIn('./' + name, bundled)
+
+    def test_symlink_cannot_escape_project(self):
+        with tempfile.TemporaryDirectory() as directory:
+            external = Path(directory) / 'external.mp4'
+            external.write_bytes(b'outside fixture')
+            (self.root / 'video.mp4').symlink_to(external)
+            with self.assertRaisesRegex(ValueError, 'inside the project'):
+                resources.available_playlist(self.root)
+
+    def test_playlist_matches_native_track_index_limit(self):
+        self.entries = [{'file': f'media/{i}.mp4', 'title': 'Track'} for i in range(1025)]
+        self.save()
+        with self.assertRaisesRegex(ValueError, '1024'):
+            resources.available_playlist(self.root)
+
+    def test_setup_check_with_custom_video_is_read_only(self):
         (self.root / 'tools').mkdir()
         shutil.copy2(ROOT / 'setup.sh', self.root / 'setup.sh')
         shutil.copy2(ROOT / 'tools/copy-player-resources.py', self.root / 'tools/copy-player-resources.py')
@@ -77,9 +116,8 @@ class ResourceTests(unittest.TestCase):
         self.assertIn('setup.sh --video', missing.stderr)
         result = subprocess.run(['zsh', str(self.root / 'setup.sh'), '--video', str(video), '--check'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.root / 'video.mp4').read_bytes(), b'fixture')
-        entry = json.loads((self.root / 'media/playlist.json').read_text())[0]
-        self.assertEqual(entry['startSeconds'], 0)
+        self.assertFalse((self.root / 'video.mp4').exists())
+        self.assertEqual(json.loads((self.root / 'media/playlist.json').read_text()), self.entries)
         self.assertFalse((self.root / 'Applications').exists())
 
     def test_release_rejects_private_files_and_embedded_digest(self):

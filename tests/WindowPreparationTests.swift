@@ -65,6 +65,24 @@ private final class ProbeState: @unchecked Sendable {
         try? await Task.sleep(nanoseconds: 50_000_000)
         precondition(cancelledState.snapshot().0 == 1, "cancelled work retried")
         precondition(cancelledPublications.count == 1, "cancelled work published late results")
+
+        let releasedState = ProbeState()
+        let releaseGate = DispatchSemaphore(value: 0)
+        var releasedController: WindowPreparation? = WindowPreparation(retryInterval: 0.01, timeout: 2, probe: { _, valid in
+            _ = releasedState.start()
+            _ = releaseGate.wait(timeout: .now() + 1)
+            releasedState.recordCancellation(!valid())
+            return .init(complete: true, eligibleWindows: 1, message: "released result")
+        }, publish: { _ in })
+        let releasedGeneration = releasedController!.begin()
+        releasedController!.enqueue(app, generation: releasedGeneration)
+        await waitFor("released-owner probe") { releasedState.snapshot().0 == 1 }
+        releasedController = nil
+        releaseGate.signal()
+        await waitFor("released-owner cancellation") { releasedState.snapshot().2 }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        precondition(releasedState.snapshot().0 == 1, "Work retried after its coordinator was released")
         print("PASS window preparation: nonblocking enqueue, off-main work, activation cancellation, stale-generation rejection, no retries after cancel")
+        print("PASS window preparation lifetime: releasing the owner revokes in-flight work without retaining the coordinator")
     }
 }

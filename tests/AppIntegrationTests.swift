@@ -85,6 +85,50 @@ struct AppIntegrationTests {
         print("PASS production menus: setup readiness, native app controls, eye-only timed exit, independent menu ownership")
         print("PASS modern status menu: original command dispatch, disabled/stale action rejection, change-only snapshots, toggle state")
         testTimerExtension(controller)
+        testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testPlaybackSnapshots(_ controller: App) {
+        // Native controls can be tested without showing a window or loading WebKit.
+        controller.playbackSlider = NSSlider(value: 0, minValue: 0, maxValue: 100, target: nil, action: nil)
+        controller.playlistIndex = 2
+        controller.playbackRevision = 7
+        controller.pendingSeek = nil
+        controller.pendingSkips = 0
+        let current: [Double] = [12, 120, 2, 7]
+        controller.applyPlaybackSnapshot(current, isDragging: false)
+        precondition(controller.playbackSlider.isEnabled && controller.playbackSlider.maxValue == 120)
+        precondition(controller.playbackSlider.doubleValue == 12 && controller.playbackSlider.toolTip != nil)
+
+        for missing in [nil, [12, 120], [Double.nan, 120, 2, 7], [12, Double.infinity, 2, 7]] as [[Double]?] {
+            controller.applyPlaybackSnapshot(missing, isDragging: false)
+            precondition(!controller.playbackSlider.isEnabled && controller.playbackSlider.doubleValue == 0 &&
+                         controller.playbackSlider.maxValue == 0 && controller.playbackSlider.toolTip == nil,
+                         "Unavailable or invalid media left a stale native seek control")
+            controller.applyPlaybackSnapshot(current, isDragging: false)
+        }
+        controller.applyPlaybackSnapshot([20, 140, 1, 7] as [Double], isDragging: false)
+        controller.applyPlaybackSnapshot([20, 140, 2, 6] as [Double], isDragging: false)
+        precondition(controller.playbackSlider.isEnabled && controller.playbackSlider.doubleValue == 12 &&
+                     controller.playbackSlider.maxValue == 120, "A stale source/revision changed the current timeline")
+        controller.applyPlaybackSnapshot([30, 120, 2, 7] as [Double], isDragging: true)
+        precondition(controller.playbackSlider.doubleValue == 12, "Playback polling moved a slider during a drag")
+        controller.pendingSeek = (18, 2)
+        controller.applyPlaybackSnapshot(nil, isDragging: false)
+        precondition(controller.playbackSlider.isEnabled && controller.playbackSlider.doubleValue == 12,
+                     "A pending seek was cleared by a transitional snapshot")
+        controller.pendingSeek = nil
+        controller.pendingSkips = 1
+        controller.applyPlaybackSnapshot(nil, isDragging: false)
+        precondition(controller.playbackSlider.isEnabled, "A pending skip was cleared by a transitional snapshot")
+        controller.pendingSkips = 0
+        controller.playerGeneration = 3
+        controller.playerJavaScriptInFlight = true
+        controller.finishPlayerJavaScript(nil, generation: 2)
+        precondition(controller.playerJavaScriptInFlight && controller.playbackSlider.isEnabled,
+                     "An old page's callback changed the new page's native controls")
+        controller.playerJavaScriptInFlight = false
+        print("PASS native playback snapshots: unavailable timeline clearing, valid restoration, stale generation/revision rejection, pending seek/skip preservation")
     }
 
     @MainActor private static func testTimerExtension(_ controller: App) {

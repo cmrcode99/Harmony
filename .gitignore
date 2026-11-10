@@ -19,3 +19,5 @@ recovery-password.txt
 keychain-password
 *.pem
 *.p12
+*.pfx
+*.key

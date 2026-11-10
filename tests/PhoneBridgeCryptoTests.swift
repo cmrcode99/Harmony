@@ -45,7 +45,65 @@ import CryptoKit
         NSGraphicsContext.restoreGraphicsState()
         return context.makeImage()!
     }
+    @MainActor static func checkConfigurationStorage() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("harmony-settings-test-" + UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let folder = root.appendingPathComponent("settings")
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent("configuration.json")
+        let uppercase = AppConfiguration(unlockDigest: String(repeating: "A", count: 64), approvedPaths: ["/missing/App.app"])
+        try JSONEncoder().encode(uppercase).write(to: url)
+        try fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: folder.path)
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        let loaded = try AppSetup.loadConfiguration(from: url)
+        precondition(loaded.unlockDigest == String(repeating: "a", count: 64))
+        precondition(loaded.approvedBundleIDs != nil)
+        let roundTrip = try JSONDecoder().decode(AppConfiguration.self, from: Data(contentsOf: url))
+        precondition(roundTrip.unlockDigest == loaded.unlockDigest && roundTrip.approvedBundleIDs == loaded.approvedBundleIDs)
+        let directoryMode = try fm.attributesOfItem(atPath: folder.path)[.posixPermissions] as! NSNumber
+        let fileMode = try fm.attributesOfItem(atPath: url.path)[.posixPermissions] as! NSNumber
+        precondition(directoryMode.intValue == 0o700 && fileMode.intValue == 0o600)
+        for bad in [
+            AppConfiguration(version: 2, unlockDigest: loaded.unlockDigest, approvedPaths: []),
+            AppConfiguration(unlockDigest: String(repeating: "Ａ", count: 64), approvedPaths: []),
+            AppConfiguration(unlockDigest: loaded.unlockDigest, approvedPaths: ["relative.app"]),
+            AppConfiguration(unlockDigest: loaded.unlockDigest, approvedPaths: [], approvedBundleIDs: ["bad app"])
+        ] {
+            var rejected = false
+            do { _ = try bad.validated() } catch { rejected = true }
+            precondition(rejected, "Malformed configuration could enable focus mode")
+        }
+        let external = root.appendingPathComponent("external.json")
+        try Data("untouched".utf8).write(to: external)
+        let link = folder.appendingPathComponent("linked.json")
+        try fm.createSymbolicLink(at: link, withDestinationURL: external)
+        var rejected = false
+        do { _ = try PrivateSettingsStore.read(from: link) } catch { rejected = true }
+        precondition(rejected, "Settings reader followed a symbolic link")
+        let externalContents = try Data(contentsOf: external)
+        precondition(externalContents == Data("untouched".utf8))
+        let linkedFolder = root.appendingPathComponent("linked-folder")
+        try fm.createSymbolicLink(at: linkedFolder, withDestinationURL: folder)
+        rejected = false
+        do { try PrivateSettingsStore.write(Data(), to: linkedFolder.appendingPathComponent("new.json")) } catch { rejected = true }
+        precondition(rejected && !fm.fileExists(atPath: folder.appendingPathComponent("new.json").path))
+        // A failed replacement must keep the previous target and clean up its
+        // staging file, rather than delete old data or leave a readable copy.
+        let directoryTarget = folder.appendingPathComponent("directory-target")
+        try fm.createDirectory(at: directoryTarget, withIntermediateDirectories: false)
+        let marker = directoryTarget.appendingPathComponent("marker")
+        try Data("previous".utf8).write(to: marker)
+        rejected = false
+        do { try PrivateSettingsStore.write(Data("replacement".utf8), to: directoryTarget) } catch { rejected = true }
+        precondition(rejected && fm.fileExists(atPath: marker.path))
+        let remainingFiles = try fm.contentsOfDirectory(atPath: folder.path)
+        precondition(!remainingFiles.contains(where: { $0.hasPrefix(".settings-") }))
+        print("PASS configuration: ASCII digest normalization, malformed input rejection, private permissions, symlink rejection, atomic replacement failure")
+    }
+
     @MainActor static func main() throws {
+        try checkConfigurationStorage()
         let password = "dummy-test-password-never-used-for-real"
         let first = try PhoneBridge.seal("1234", password: password)
         let second = try PhoneBridge.seal("1234", password: password)

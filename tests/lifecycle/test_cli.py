@@ -40,6 +40,21 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(calls, [])
 
+    def test_uninstall_uses_helper_without_opening_the_app(self):
+        helper = self.root / '.local/lib/harmony/manage-install.sh'
+        helper.parent.mkdir(parents=True)
+        helper.write_text('#!/bin/zsh\nprint -r -- "$*" > "$TEST_LOG"\n')
+        self.log.unlink(missing_ok=True)
+        result = subprocess.run([str(self.launcher), 'uninstall', '--remove-data'], env=self.env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.log.read_text().strip(), 'uninstall --remove-data')
+        helper.unlink()
+        result = subprocess.run([str(self.launcher), 'uninstall'], env=self.env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('uninstall helper is missing', result.stderr)
+
     def test_running_actions(self):
         for args,action in [(('hide',),'hide'),(('unhide',),'unhide'),(('exit',),'exit'),(('phone',),'phone')]:
             with self.subTest(action=action):

@@ -6,21 +6,26 @@ import JavaScriptCore
         let html = try String(contentsOfFile: "player.html", encoding: .utf8)
         guard let start = html.range(of: "<script>"),
               let end = html.range(of: "</script>", range: start.upperBound..<html.endIndex) else { fatalError("Missing player script") }
-        let context = JSContext()!
-        var failure: String?
-        context.exceptionHandler = { _, error in failure = error?.toString() ?? "JavaScript error" }
-        context.evaluateScript("""
-        var events = {}, order = [], messages = [];
-        var loadCount=0, fakeStatus={hidden:true,textContent:''};
-        var fakeVideo = {paused:true,currentTime:0,duration:100,volume:0.7,muted:true,style:{}, load:function(){loadCount++;this.currentTime=0;this.duration=NaN;this.paused=true;}, setAttribute:function(){}, pause:function(){this.paused=true;order.push('pause');}, play:function(){this.paused=false;order.push('play');return Promise.resolve();}, addEventListener:function(n,f){events[n]=f;}};
-        var window = {webkit:{messageHandlers:{togglePlayback:{postMessage:function(m){order.push('message');messages.push(m);}}}}};
-        var document = {querySelector:function(s){return s==='video'?fakeVideo:fakeStatus;}};
-        function check(value,message){if(!value)throw new Error(message);}
-        function completeLoad(){fakeVideo.duration=600;events.loadedmetadata();events.seeked();}
-        """)
+        let script = String(html[start.upperBound..<end.lowerBound])
+        var failures: [String] = []
+        func makePlayer(_ playlist: String) -> JSContext {
+            let context = JSContext()!
+            context.exceptionHandler = { _, error in failures.append(error?.toString() ?? "JavaScript error") }
+            context.evaluateScript("""
+            var events = {}, order = [], messages = [];
+            var loadCount=0, fakeStatus={hidden:true,textContent:''};
+            var fakeVideo = {paused:true,currentTime:0,duration:100,volume:0.7,muted:true,style:{}, load:function(){loadCount++;this.currentTime=0;this.duration=NaN;this.paused=true;}, setAttribute:function(){}, pause:function(){this.paused=true;order.push('pause');}, play:function(){this.paused=false;order.push('play');return Promise.resolve();}, addEventListener:function(n,f){events[n]=f;}};
+            var window = {webkit:{messageHandlers:{togglePlayback:{postMessage:function(m){order.push('message');messages.push(m);}}}}};
+            var document = {querySelector:function(s){return s==='video'?fakeVideo:fakeStatus;}};
+            function check(value,message){if(!value)throw new Error(message);}
+            function completeLoad(){fakeVideo.duration=600;events.loadedmetadata();events.seeked();}
+            """)
+            context.evaluateScript("window.harmonyPlaylist = " + playlist + ";")
+            context.evaluateScript(script)
+            return context
+        }
         let playlist = try String(contentsOfFile: "media/playlist.json", encoding: .utf8)
-        context.evaluateScript("window.harmonyPlaylist = " + playlist + ";")
-        context.evaluateScript(String(html[start.upperBound..<end.lowerBound]))
+        let context = makePlayer(playlist)
         context.evaluateScript("""
         window.harmonySkipVideo();
         check(loadCount===0,'Skip ran before initialization');
@@ -89,13 +94,31 @@ import JavaScriptCore
         check(loadCount===before,'Invalid skip changed source');
         for(var i=0;i<window.harmonyPlaylist.length;i++) events.error();
         check(!fakeStatus.hidden && fakeVideo.paused,'All-file failure did not show a stopped state');
-        before=loadCount;events.error();events.loadedmetadata();
+        before=loadCount;events.error();events.loadedmetadata();events.seeked();events.ended();
         check(loadCount===before && fakeVideo.paused,'Media errors created an endless retry loop');
+        check(window.harmonyPlaybackSnapshot()===null,'Failed media exposed a stale scrub timeline');
         window.harmonySkipVideo();
         completeLoad();
         check(fakeStatus.hidden && window.harmonyTrackIndex===2 && fakeVideo.paused,'Manual skip could not recover without changing pause');
         """)
-        if let failure = failure { fatalError(failure) }
-        print("PASS player: pause/state ordering, keyboard, playlist wrap/end/skip, pause/audio/visibility, two-minute trim without intro flashes, relative scrub bounds, source snapshots and bounded error recovery")
+        let specialNames = makePlayer(#"[{"file":"media/focus #1?100%:ready.mp4","title":"Special name","startSeconds":0}]"#)
+        specialNames.evaluateScript("""
+        window.harmonyApplyPlayback(false,0,true,1);
+        check(fakeVideo.src==='media/focus%20%231%3F100%25%3Aready.mp4','Filename was interpreted as URL syntax');
+        completeLoad();
+        check(!fakeVideo.paused && fakeVideo.currentTime===0,'A zero-trim local video failed to play');
+        """)
+        for playlist in ["undefined", "[]", "{}", #"[null,{}, {"file":"../outside.mp4","title":"bad"}, {"file":"video.mp4","title":"bad","startSeconds":-1}]"#] {
+            let empty = makePlayer(playlist)
+            empty.evaluateScript("""
+            window.harmonyApplyPlayback(false,0,true,1);
+            check(loadCount===0 && !fakeStatus.hidden && fakeStatus.textContent.includes('No videos'),'Missing playlist did not explain recovery');
+            window.harmonySkipVideo();events.loadedmetadata();events.seeked();events.ended();
+            check(loadCount===0 && fakeVideo.paused,'Empty playlist attempted loading or playback');
+            check(window.harmonyPlaybackSnapshot()===null,'Empty playlist exposed a scrub timeline');
+            """)
+        }
+        if !failures.isEmpty { fatalError(failures.joined(separator: "\n")) }
+        print("PASS player: pause/state ordering, keyboard, playlist wrap/end/skip, pause/audio/visibility, two-minute trim without intro flashes, relative scrub bounds, source snapshots, encoded local filenames, missing-playlist recovery and bounded error recovery")
     }
 }
