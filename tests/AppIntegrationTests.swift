@@ -44,6 +44,7 @@ struct AppIntegrationTests {
         testWindowControlPermissions(menuProbe)
         testTimedSettingsLock()
         testBundledAppApproval()
+        testSettingsWindowCompletions()
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -112,6 +113,33 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testSettingsWindowCompletions() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("harmony-window-close-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let config = AppConfiguration(unlockDigest: String(repeating: "a", count: 64), approvedPaths: [])
+        let previousModal = NSApp.modalWindow
+        for index in 0..<3 {
+            var completions = 0
+            let editor = HarmonySettingsWindow(configuration: config, library: VideoLibrary(directory: directory.appendingPathComponent("cancel-\(index)")), onFinish: { result in
+                precondition(result == nil)
+                completions += 1
+            })
+            editor.model.cancel()
+            editor.model.cancel()
+            precondition(completions == 1, "Cancel completed the same settings window more than once")
+            precondition(NSApp.modalWindow === previousModal, "Settings left behind a modal session")
+        }
+        var saved = 0
+        let editor = HarmonySettingsWindow(configuration: config, library: VideoLibrary(directory: directory.appendingPathComponent("save")), onFinish: { result in
+            precondition(result?.unlockDigest == config.unlockDigest)
+            saved += 1
+        })
+        editor.model.save()
+        editor.model.cancel()
+        precondition(saved == 1 && NSApp.modalWindow === previousModal)
+        print("PASS settings windows: repeated cancel/save completion, no nested modal session")
     }
 
     private static func testBundledAppApproval() {

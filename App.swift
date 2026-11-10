@@ -48,6 +48,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var windowControlPermissionState = WindowControlPermissionState()
     var checkWindowControlPermission: () -> Bool = { AXIsProcessTrusted() }
     var settingsOpen = false
+    var settingsWindow: HarmonySettingsWindow?
     var settingsSuspendedFocus = false
     var focusEnabled = true
     private var suspensions = FocusSuspensions()
@@ -111,7 +112,20 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         installApplicationMenu()
 #if !HARMONY_TESTING
         let existed = FileManager.default.fileExists(atPath: AppSetup.configurationURL.path)
-        guard let configuration = AppSetup.loadOrCreate(defaultPaths: Self.defaultApprovedPaths) else { exit(0) }
+        if !existed {
+            settingsWindow = AppSetup.createConfiguration(defaultPaths: Self.defaultApprovedPaths) { [weak self] _ in
+                self?.settingsWindow = nil
+                NSApp.terminate(nil)
+            }
+            return
+        }
+        let configuration: AppConfiguration
+        do { configuration = try AppSetup.loadConfiguration(from: AppSetup.configurationURL) }
+        catch {
+            AppSetup.notice("Could not load Harmony settings", "Your settings were left untouched. Ask your setup agent to repair configuration.json from your backup before starting a new session.")
+            NSApp.terminate(nil)
+            return
+        }
         self.configuration = configuration
         approvalPolicy = AppApprovalPolicy(approvedPaths: configuration.approvedPaths, bundleIDs: configuration.approvedIDs)
         if CommandLine.arguments.contains("--configure-phone") {
@@ -119,13 +133,17 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             exit(0)
         }
         // First-run setup is never also consent to force-quit running apps.
-        if CommandLine.arguments.contains("--configure-only"), existed {
-            _ = HarmonySettingsWindow(configuration: configuration, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil, onSave: { edited in
+        if CommandLine.arguments.contains("--configure-only") {
+            let editor = HarmonySettingsWindow(configuration: configuration, section: SettingsSection.launchSelection, revealFinder: SettingsSection.launchSelection != nil, onSave: { edited in
                 try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
-            }).run()
-            exit(0)
+            }, onFinish: { [weak self] _ in
+                self?.settingsWindow = nil
+                NSApp.terminate(nil)
+            })
+            settingsWindow = editor
+            editor.show()
+            return
         }
-        if !existed { exit(0) }
 #endif
         createOverlay()
         installStatusMenu()
@@ -217,21 +235,26 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         windowPreparation.cancel()
         panel.orderOut(nil)
         updatePlayer()
-        defer {
-            settingsOpen = false
-            focusEnabled = enabled
-            settingsSuspendedFocus = false
-            if visible { panel.orderFrontRegardless() }
-            updatePlayer()
-        }
-        if let edited = HarmonySettingsWindow(configuration: current, sessionPaused: enabled, section: section, revealFinder: section != nil, onSave: { edited in
+        let editor = HarmonySettingsWindow(configuration: current, sessionPaused: enabled, section: section, revealFinder: section != nil, onSave: { edited in
             try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
-        }).run() {
-            configuration = edited
-            approvalPolicy = AppApprovalPolicy(approvedPaths: edited.approvedPaths, bundleIDs: edited.approvedIDs)
-            playlistIndex = 0
-            reload()
-        }
+        }, onFinish: { [weak self] edited in
+            guard let self else { return }
+            if let edited {
+                self.configuration = edited
+                self.approvalPolicy = AppApprovalPolicy(approvedPaths: edited.approvedPaths, bundleIDs: edited.approvedIDs)
+                self.playlistIndex = 0
+                self.reload()
+            }
+            self.settingsWindow = nil
+            self.settingsOpen = false
+            self.focusEnabled = enabled
+            self.settingsSuspendedFocus = false
+            if visible { self.panel.orderFrontRegardless() }
+            self.updatePlayer()
+            self.tickLock()
+        })
+        settingsWindow = editor
+        editor.show()
     }
 
     func launchApprovedApps(launchMissing: Bool = true) {

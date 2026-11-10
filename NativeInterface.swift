@@ -62,7 +62,9 @@ private struct HarmonyStatusMenuContent: View {
     }
     private func perform(_ index: Int) {
         dismiss()
-        model.perform(index)
+        // Let the menu host close before opening an AppKit settings window.
+        let action = model.perform
+        DispatchQueue.main.async { action(index) }
     }
 }
 

@@ -258,10 +258,9 @@ private struct SettingsGlassSurface: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if reduceTransparency {
             content.background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: radius))
-        } else if #available(macOS 26.0, *) {
-            content.foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius))
         } else {
+            // Native lists need a material background rather than being
+            // flattened into a glassEffect snapshot when the window reopens.
             content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: radius))
         }
     }
@@ -481,15 +480,18 @@ private struct SettingsControlStyle: ViewModifier {
 @MainActor final class HarmonySettingsWindow: NSObject, NSWindowDelegate {
     let model: HarmonySettingsModel
     let window: NSWindow
-    private var result: AppConfiguration?
+    private var completion: ((AppConfiguration?) -> Void)?
+    private var finished = false
     private let section: SettingsSection?
     private let revealFinder: Bool
 
     init(configuration: AppConfiguration, firstRun: Bool = false, sessionPaused: Bool = false, library: VideoLibrary = .user,
          section: SettingsSection? = nil, revealFinder: Bool = false,
-         onSave: ((AppConfiguration) throws -> Void)? = nil) {
+         onSave: ((AppConfiguration) throws -> Void)? = nil,
+         onFinish: ((AppConfiguration?) -> Void)? = nil) {
         self.section = section
         self.revealFinder = revealFinder
+        completion = onFinish
         model = HarmonySettingsModel(configuration: configuration, library: library)
         model.onSave = onSave
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 520), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
@@ -504,13 +506,11 @@ private struct SettingsControlStyle: ViewModifier {
         window.contentView = NSHostingView(rootView: HarmonySettingsView(model: model, firstRun: firstRun, sessionPaused: sessionPaused, section: section))
         window.delegate = self
         model.finish = { [weak self] configuration in
-            self?.result = configuration
-            NSApp.stopModal()
-            self?.window.orderOut(nil)
+            self?.complete(configuration)
         }
     }
 
-    func run() -> AppConfiguration? {
+    func show() {
         window.center()
         if revealFinder, let section {
             NSWorkspace.shared.open(section.finderDirectory)
@@ -522,10 +522,16 @@ private struct SettingsControlStyle: ViewModifier {
         }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.runModal(for: window)
-        window.orderOut(nil)
-        return result
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool { model.cancel(); return true }
+    private func complete(_ configuration: AppConfiguration?) {
+        guard !finished else { return }
+        finished = true
+        let callback = completion
+        completion = nil
+        window.close()
+        callback?(configuration)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool { model.cancel(); return false }
 }
