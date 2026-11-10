@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — 1.7.3
+## Unreleased — 1.7.4
+
+- Fixed approved apps with bundled helper applications, including Docker Desktop, being force-quit because the helper uses a different bundle identifier.
+
+## 1.7.3
 
 - Fixed selection in Allowed apps. Select one app, or Command-click/Shift-click several, then choose Remove apps. Changes take effect when saved; application files are not deleted.
 - Kept all app/video settings entry points disabled during timed sessions, with an explanation in the menu.

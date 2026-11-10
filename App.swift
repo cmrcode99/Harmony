@@ -67,7 +67,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var lockUptimeEnd: TimeInterval?
     var lockWallEnd = UserDefaults.standard.double(forKey: "lockEnd")
     private var configuration: AppConfiguration?
-    private var configuredAllowedIDs = Set<String>()
+    private var approvalPolicy = AppApprovalPolicy(approvedPaths: [], bundleIDs: [])
     var unlockDigest: String { configuration?.unlockDigest ?? "" }
     var isLocked: Bool { lockRemaining > 0 }
     var settingsEditingAllowed: Bool {
@@ -77,7 +77,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         FocusDeadline.remaining(wallDeadline: lockWallEnd, uptimeDeadline: lockUptimeEnd,
                                 now: Date().timeIntervalSince1970, uptime: ProcessInfo.processInfo.systemUptime)
     }
-    var allowedApps: Set<String> { configuredAllowedIDs }
+    private func isApproved(_ app: NSRunningApplication) -> Bool {
+        approvalPolicy.allows(bundleIdentifier: app.bundleIdentifier, bundleURL: app.bundleURL)
+    }
     var activationObserver: NSObjectProtocol?
     var screenObserver: NSObjectProtocol?
     var displayObserver: NSObjectProtocol?
@@ -111,7 +113,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         let existed = FileManager.default.fileExists(atPath: AppSetup.configurationURL.path)
         guard let configuration = AppSetup.loadOrCreate(defaultPaths: Self.defaultApprovedPaths) else { exit(0) }
         self.configuration = configuration
-        configuredAllowedIDs = configuration.approvedIDs
+        approvalPolicy = AppApprovalPolicy(approvedPaths: configuration.approvedPaths, bundleIDs: configuration.approvedIDs)
         if CommandLine.arguments.contains("--configure-phone") {
             AppSetup.configurePhone(configuration)
             exit(0)
@@ -226,7 +228,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             try PrivateSettingsStore.write(JSONEncoder().encode(edited), to: AppSetup.configurationURL)
         }).run() {
             configuration = edited
-            configuredAllowedIDs = edited.approvedIDs
+            approvalPolicy = AppApprovalPolicy(approvedPaths: edited.approvedPaths, bundleIDs: edited.approvedIDs)
             playlistIndex = 0
             reload()
         }
@@ -236,7 +238,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         guard focusEnabled else { return }
         let generation = windowPreparation.begin()
         let running = NSWorkspace.shared.runningApplications
-        for app in running where allowedApps.contains(app.bundleIdentifier ?? "") && app.bundleIdentifier != "local.harmony.focus" && app.bundleIdentifier != "com.cmuxterm.app" {
+        for app in running where isApproved(app) && app.bundleIdentifier != "local.harmony.focus" && app.bundleIdentifier != "com.cmuxterm.app" {
             windowPreparation.enqueue(app, generation: generation)
         }
         // Apps already opening for this session must join the refreshed pass
@@ -274,15 +276,15 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         if let path = app.bundleURL?.path,
            path.hasPrefix("/System/Library/") { return }
         guard focusEnabled, !app.isTerminated, app.activationPolicy == .regular,
-              !allowedApps.contains(app.bundleIdentifier ?? ""),
+              !isApproved(app),
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         app.forceTerminate()
     }
     func enforceFocus(_ app: NSRunningApplication) {
         tickLock()
         guard !interactionsSuspended, focusEnabled, !app.isTerminated else { return }
-        if let id = app.bundleIdentifier, allowedApps.contains(id) {
-            if id != "local.harmony.focus" {
+        if isApproved(app) {
+            if app.bundleIdentifier != "local.harmony.focus" {
                 windowPreparation.userActivated(app)
             }
             return
