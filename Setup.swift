@@ -50,11 +50,15 @@ enum PrivateSettingsStore {
 
     static func read(from url: URL) throws -> Data {
         try prepareDirectory(url.deletingLastPathComponent())
-        let fm = FileManager.default
-        let attributes = try fm.attributesOfItem(atPath: url.path)
-        guard attributes[.type] as? FileAttributeType == .typeRegular else { throw CocoaError(.fileReadInvalidFileName) }
-        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        return try Data(contentsOf: url)
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { Darwin.close(descriptor) }
+        var attributes = stat()
+        guard fstat(descriptor, &attributes) == 0,
+              attributes.st_mode & S_IFMT == S_IFREG else { throw CocoaError(.fileReadInvalidFileName) }
+        guard fchmod(descriptor, 0o600) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        // Use the verified descriptor so a path swap cannot redirect the read.
+        return try FileHandle(fileDescriptor: descriptor, closeOnDealloc: false).readToEnd() ?? Data()
     }
 
     static func write(_ data: Data, to url: URL) throws {
@@ -63,8 +67,20 @@ enum PrivateSettingsStore {
         try prepareDirectory(directory)
         let temporary = directory.appendingPathComponent(".settings-" + UUID().uuidString)
         defer { try? fm.removeItem(at: temporary) }
-        try data.write(to: temporary, options: .withoutOverwriting)
-        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        let descriptor = Darwin.open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+        guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { Darwin.close(descriptor) }
+        // Restrict access when creating the file, before writing its first byte.
+        try data.withUnsafeBytes { buffer in
+            var offset = 0
+            while offset < buffer.count {
+                let count = Darwin.write(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset)
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(count == 0 ? EIO : errno)) }
+                offset += count
+            }
+        }
+        guard fsync(descriptor) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
         // rename(2) atomically replaces a file (including a symlink itself),
         // without following the destination or leaving a missing-file window.
         guard Darwin.rename(temporary.path, url.path) == 0 else {

@@ -27,10 +27,13 @@ swiftc -O -whole-module-optimization -target "${HARMONY_ARCH:-$(uname -m)}-apple
 cp Info.plist "$APP/Contents/Info.plist"
 mkdir -p "$APP/Contents/Resources"
 python3 tools/copy-player-resources.py "$APP/Contents/Resources"
-if [[ -f assets/Harmony.icns ]]; then
-  cp assets/Harmony.icns "$APP/Contents/Resources/"
-  /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string Harmony' "$APP/Contents/Info.plist"
+if [[ -n "${HARMONY_ICON:-}" ]]; then
+  [[ -f "$HARMONY_ICON" ]] || { print -u2 'HARMONY_ICON must point to an .icns file.'; exit 1; }
+  cp "$HARMONY_ICON" "$APP/Contents/Resources/Harmony.icns"
+else
+  swift tools/make-icon.swift "$APP/Contents/Resources/Harmony.icns"
 fi
+/usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string Harmony' "$APP/Contents/Info.plist"
 codesign --force --sign "${HARMONY_SIGN_IDENTITY:--}" "$APP"
 codesign --verify --deep --strict "$APP"
 if (( stage_only )); then
