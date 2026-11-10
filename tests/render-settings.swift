@@ -4,7 +4,7 @@ import SwiftUI
 
 @main struct SettingsPreview {
     @MainActor static func main() throws {
-        guard CommandLine.arguments.count == 2 else { fatalError("Pass an output PNG path") }
+        guard CommandLine.arguments.count >= 2 else { fatalError("Pass an output PNG path, optionally --videos, --empty, or --light") }
         NSApplication.shared.setActivationPolicy(.prohibited)
         NSApplication.shared.applicationIconImage = NSImage(contentsOfFile: "assets/Harmony.icns")
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -13,10 +13,14 @@ import SwiftUI
             "/Applications/ChatGPT.app", "/Applications/Claude.app", "/System/Applications/Utilities/Terminal.app"
         ])
         let model = HarmonySettingsModel(configuration: config, library: VideoLibrary(directory: temporary))
-        model.videos = [LibraryVideo(file: "clip-demo.mp4", title: "Evening rain"), LibraryVideo(file: "clip-demo2.mov", title: "My focus video")]
-        model.useIncludedVideos = false
-        let view = NSHostingView(rootView: HarmonySettingsView(model: model, firstRun: true))
-        view.frame = NSRect(x: 0, y: 0, width: 900, height: 580)
+        if !CommandLine.arguments.contains("--empty") {
+            model.videos = [LibraryVideo(file: "clip-demo.mp4", title: "Evening rain"), LibraryVideo(file: "clip-demo2.mov", title: "My focus video")]
+            model.useIncludedVideos = false
+        }
+        let section: SettingsSection = CommandLine.arguments.contains("--videos") ? .videos : .apps
+        let view = NSHostingView(rootView: HarmonySettingsView(model: model, sessionPaused: true, section: section))
+        if CommandLine.arguments.contains("--light") { view.appearance = NSAppearance(named: .aqua) }
+        view.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
         let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = view
         view.layoutSubtreeIfNeeded()
