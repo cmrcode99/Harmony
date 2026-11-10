@@ -5,10 +5,12 @@ cd "${0:A:h}"
 check_only=0
 configure=1
 video=''
+default_videos=1
 while (( $# )); do
   case "$1" in
     --check) check_only=1; shift ;;
     --no-open) configure=0; shift ;;
+    --no-default-videos) default_videos=0; shift ;;
     --video)
       if (( $# < 2 )) || [[ -n "$video" || ! -f "$2" || "${2:e:l}" != mp4 ]]; then
         print -u2 'Use --video /path/to/a-video.mp4 once.'; exit 2
@@ -16,9 +18,10 @@ while (( $# )); do
       video="${2:A}"
       shift 2 ;;
     --help|-h)
-      print 'Usage: ./setup.sh [--check] [--no-open] [--video /path/to/video.mp4]'
+      print 'Usage: ./setup.sh [--check] [--no-open] [--no-default-videos] [--video /path/to/video.mp4]'
       print 'Checks requirements, builds, installs, and opens first-run setup only.'
       print '--check validates without changing files or the installed app.'
+      print '--no-default-videos skips the bundled-playlist download so you can add your own videos.'
       exit 0 ;;
     *) print -u2 "Unknown option: $1"; exit 2 ;;
   esac
@@ -42,6 +45,9 @@ else
 fi
 print 'Requirements ready: macOS, Swift, Python. Videos can be added in the app.'
 if (( check_only )); then exit 0; fi
+if (( default_videos )) && [[ -z "$video" ]]; then
+  python3 tools/fetch-default-videos.py
+fi
 if [[ -n "$video" ]]; then
   python3 - "$video" <<'MEDIA'
 import json

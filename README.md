@@ -24,6 +24,8 @@ Choose **Allowed apps** or **Allowed videos** below **Move window** in the eye m
 
 Videos are copied into Harmony's local library. Removing one deletes only that copy; your original file stays put. Changes persist through updates. Settings pause untimed focus while open, and remain locked during timed sessions.
 
+You can add, reorder, or remove videos in one custom playlist, then choose **Use included playlist** to switch back. The default video files are hosted in the [default playlist release](https://github.com/cmrcode99/Harmony/releases/tag/default-videos-v1), and setup downloads them automatically.
+
 To remove allowed apps, select a row, or Command-click/Shift-click several rows, then click **Remove apps** and **Save changes**. This changes the allowlist; it does not delete the apps from your Mac. Finder and System Settings always stay allowed.
 
 ## Set up yourself
@@ -44,6 +46,8 @@ cd Harmony
 ```
 
 The first command checks requirements without changing files. The second builds and installs `~/Applications/Harmony.app` and `~/.local/bin/harmony`, then opens setup. If developer tools are missing, run `xcode-select --install`; an older SDK may need updating to meet the build requirement. [Apple lists supported build systems](https://developer.apple.com/xcode/system-requirements/).
+
+Setup downloads the four default videos (about 472 MiB) from GitHub, verifies them, and preserves any existing local videos. To skip the download and add your own videos in the app, run `./setup.sh --no-default-videos`. An interrupted download can be retried by running setup again.
 
 Choose the apps you want available and save the generated recovery password somewhere accessible. **Setup does not start a focus session.** In **System Settings → Privacy & Security**, allow Harmony under **Accessibility** or **Device Control and Data Access**, depending on your macOS version. This permission lets Harmony minimize windows. Screen Recording is needed only for the phone helper.
 

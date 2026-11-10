@@ -3,6 +3,8 @@
 ## Unreleased — 1.7.3
 
 - Fixed selection in Allowed apps. Select one app, or Command-click/Shift-click several, then choose Remove apps. Changes take effect when saved; application files are not deleted.
+- Kept all app/video settings entry points disabled during timed sessions, with an explanation in the menu.
+- Hosted the default playlist videos on GitHub and added verified automatic downloads during setup, with an option to use only your own videos.
 
 ## 1.7.2
 

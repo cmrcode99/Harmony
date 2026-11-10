@@ -80,6 +80,23 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(json.loads(self.playlist.read_text())[0]['startSeconds'], 0)
         self.assertTrue((self.root / 'build-called').is_file())
 
+    def test_default_videos_are_fetched_before_build(self):
+        (self.root / 'tools/fetch-default-videos.py').write_text("from pathlib import Path\nPath('downloads-called').touch()\n")
+        result = self.setup('--no-open')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / 'downloads-called').is_file())
+        self.assertTrue((self.root / 'build-called').is_file())
+
+    def test_offline_setup_skips_default_downloads(self):
+        result = self.setup('--no-open', '--no-default-videos')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / 'build-called').is_file())
+
+    def test_default_check_never_fetches(self):
+        result = self.setup('--check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_unmodified()
+
 
 if __name__ == '__main__':
     unittest.main()

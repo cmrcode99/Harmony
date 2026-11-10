@@ -58,7 +58,7 @@ extension App {
         let about = NSMenuItem(title: "About Harmony", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         applicationMenu.addItem(about)
         let settings = add(applicationMenu, "Apps and videos", #selector(openSettings), ",")
-        settings.isEnabled = uiReady && !isLocked
+        settings.isEnabled = uiReady && settingsEditingAllowed
         applicationSettingsItem = settings
         applicationWindowControlItem = add(applicationMenu, "Enable window control", #selector(openWindowControlSettings))
         updateWindowControlMenuItems(granted: checkWindowControlPermission())

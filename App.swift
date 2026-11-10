@@ -70,6 +70,9 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     private var configuredAllowedIDs = Set<String>()
     var unlockDigest: String { configuration?.unlockDigest ?? "" }
     var isLocked: Bool { lockRemaining > 0 }
+    var settingsEditingAllowed: Bool {
+        !settingsOpen && !isLocked && !unlockPromptOpen && !phoneBridge.isBusy
+    }
     var lockRemaining: TimeInterval {
         FocusDeadline.remaining(wallDeadline: lockWallEnd, uptimeDeadline: lockUptimeEnd,
                                 now: Date().timeIntervalSince1970, uptime: ProcessInfo.processInfo.systemUptime)
@@ -203,7 +206,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     @objc func openAllowedVideos() { presentSettings(section: .videos) }
 
     private func presentSettings(section: SettingsSection? = nil) {
-        guard !settingsOpen, !isLocked, !unlockPromptOpen, !phoneBridge.isBusy, let current = configuration else { return }
+        guard settingsEditingAllowed, let current = configuration else { return }
         settingsOpen = true
         let enabled = focusEnabled
         settingsSuspendedFocus = enabled
@@ -447,9 +450,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     }
     func tickLock() {
         let locked = isLocked
-        settingsItem?.isEnabled = !settingsOpen && !locked && !unlockPromptOpen && !phoneBridge.isBusy
+        settingsItem?.isEnabled = settingsEditingAllowed
         videoSettingsItem?.isEnabled = settingsItem?.isEnabled ?? false
         applicationSettingsItem?.isEnabled = settingsItem?.isEnabled ?? false
+        for item in [settingsItem, videoSettingsItem, applicationSettingsItem].compactMap({ $0 }) {
+            item.toolTip = locked ? "Finish your timed session to change apps or videos." : nil
+        }
         if applicationQuitItem?.isEnabled == locked { applicationQuitItem?.isEnabled = !locked }
         let quitTitle = locked ? "Quit Harmony Focus…" : "Quit Harmony"
         if quitItem.title != quitTitle { quitItem.title = quitTitle }

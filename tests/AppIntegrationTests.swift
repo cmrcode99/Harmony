@@ -42,6 +42,7 @@ struct AppIntegrationTests {
         precondition(SettingsSection.videos.finderDirectory.isFileURL)
         print("PASS settings shortcuts: menu placement, section routing and Finder directories")
         testWindowControlPermissions(menuProbe)
+        testTimedSettingsLock()
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -110,6 +111,30 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testTimedSettingsLock() {
+        let controller = App()
+        controller.uiReady = true
+        controller.lockWallEnd = Date().timeIntervalSince1970 + 3600
+        controller.statusMenu = controller.makeStatusMenu()
+        controller.installApplicationMenu()
+        controller.tickLock()
+        precondition(!controller.settingsEditingAllowed)
+        for item in [controller.settingsItem!, controller.videoSettingsItem!, controller.applicationSettingsItem!] {
+            precondition(!item.isEnabled && item.toolTip?.contains("timed session") == true,
+                         "A timed session exposed app or video editing")
+        }
+        controller.openSettings()
+        controller.openAllowedApps()
+        controller.openAllowedVideos()
+        precondition(!controller.settingsOpen && controller.isLocked, "A settings action interrupted the timer")
+        controller.lockWallEnd = 0
+        controller.tickLock()
+        precondition(controller.settingsEditingAllowed)
+        precondition(controller.settingsItem!.isEnabled && controller.videoSettingsItem!.isEnabled && controller.applicationSettingsItem!.isEnabled,
+                     "App and video editing did not return after the timer")
+        print("PASS timed settings: all app/video entry points disabled until the session ends")
     }
 
     @MainActor private static func testWindowControlPermissions(_ controller: App) {
