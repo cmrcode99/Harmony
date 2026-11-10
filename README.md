@@ -43,7 +43,7 @@ cd Harmony
 
 The first command checks requirements without changing files. The second builds and installs `~/Applications/Harmony.app` and `~/.local/bin/harmony`, then opens setup. If developer tools are missing, run `xcode-select --install`; an older SDK may need updating to meet the build requirement. [Apple lists supported build systems](https://developer.apple.com/xcode/system-requirements/).
 
-Choose the apps you want available and save the generated recovery password somewhere accessible. **Setup does not start a focus session.** Enable Harmony in **System Settings → Privacy & Security → Accessibility** for window control. Screen Recording is needed only for the phone helper.
+Choose the apps you want available and save the generated recovery password somewhere accessible. **Setup does not start a focus session.** In **System Settings → Privacy & Security**, allow Harmony under **Accessibility** or **Device Control and Data Access**, depending on your macOS version. This permission lets Harmony minimize windows. Screen Recording is needed only for the phone helper.
 
 Add MP4, M4V, or MOV videos in the settings window, during setup or later. Videos stay local. No video file is required to build or install. Developers can still bundle a playlist through `media/playlist.json` or pass `--video /path/to/video.mp4` to setup.
 
@@ -51,7 +51,7 @@ If you received a prebuilt package, unzip it and run **Install Harmony.command**
 
 ## Focus sessions
 
-**Harmony force-quits apps outside your allowed list. Save work before starting.** Finder and System Settings stay available. Approved apps are opened and their windows minimized once; cmux stays unminimized.
+**Harmony force-quits apps outside your allowed list. Save work before starting.** Finder and System Settings stay available. Approved apps are opened and their windows minimized once; approved cmux stays unminimized. Other terminal apps need to be allowed and may be minimized. Reopen any approved app when you need it; Harmony does not keep minimizing it during the session.
 
 ```sh
 ~/.local/bin/harmony          # start untimed focus mode
@@ -77,7 +77,7 @@ Click the video to pause/resume; hover for volume, seeking, and Skip. The eye me
 
 ## Update or uninstall
 
-Finish the current session and exit Harmony before updating. Rerun `./setup.sh` from an updated checkout, or run a newer package's installer. Updates keep your settings; installation rolls back if replacement fails.
+Finish the current session and exit Harmony before updating. Rerun `./setup.sh` from an updated checkout, or run a newer package's installer. Updates keep your settings; installation rolls back if replacement fails. macOS may ask you to approve window-control or phone permissions again after an update. If windows stop minimizing, end the session, check Harmony's permission in Privacy & Security, and quit Harmony before trying again.
 
 ```sh
 harmony uninstall                 # remove the app, CLI, and recovery service

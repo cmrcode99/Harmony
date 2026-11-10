@@ -10,12 +10,14 @@ Drag apps and videos into the setup window, save your Harmony recovery password,
 and approve macOS permissions. Enter passwords only in the app's local
 windows, never in chat.
 
-Harmony closes apps outside your allowed list during focus sessions.
+Harmony force-quits apps outside your allowed list during focus sessions.
 Save work before starting. Installation itself does not start focus mode.
 
 Setting up without an agent? Run Install Harmony.command, finish the setup
-window, and enable Accessibility for Harmony in System Settings. The phone
-helper is optional; you can skip it and use the Mac app normally.
+window, then open System Settings → Privacy & Security. Enable Harmony under
+Accessibility or Device Control and Data Access (the name varies by macOS
+version). This lets Harmony minimize windows. The phone helper is optional;
+you can skip it and use the Mac app normally.
 
 This is an early beta, locally signed and not Apple-notarized. The package
 requires macOS 13 or later and the architecture shown in its ZIP name.

@@ -15,11 +15,13 @@ Each user has a separate Harmony configuration. No account or shared password is
 
 End the current session and quit Harmony. Rerun setup from an updated source checkout or run the installer from a newer package. The installer checks for an active or unfinished timed session and keeps local configuration. Failed replacement attempts roll back the app and service files.
 
+Preserved settings do not guarantee preserved macOS permissions. If window minimization stops working after replacing a build, end the session, check Harmony under **System Settings → Privacy & Security → Accessibility** or **Device Control and Data Access**, and quit Harmony before trying again. The optional phone helper may also need Screen Recording approval again.
+
 If installation reports an unfinished session, finish it through the eye menu with the recovery password, or let its deadline pass. Do not delete a deadline or kill a process as an update shortcut.
 
 ## Change allowed apps and videos
 
-Open **Apps and videos…** in Harmony or run `harmony setup` while the app is off. Drag apps or video files into their lists, or use the Add/Remove buttons. Changes are saved locally; no rebuild or JSON editing is needed. Timed sessions must finish before settings can change.
+Open **Allowed apps…** or **Allowed videos…** below **Move window** in the eye menu to open settings and Finder together. You can also use **Apps and videos…** in the application menu or run `harmony setup` while the app is off. Drag apps or video files into their lists, or use the Add/Remove buttons. Changes are saved locally; no rebuild or JSON editing is needed. Untimed focus pauses while settings are open and resumes when they close. Timed sessions must finish before settings can change.
 
 Custom videos and their playlist are in `~/Library/Application Support/Harmony Focus/Media/`. Removing a video removes Harmony’s copy only. To return to the bundled playlist, choose **Use included playlist**. User media is preserved by default during uninstall. Advanced configuration edits must preserve `version` and `unlockDigest` and keep app paths and bundle identifiers synchronized.
 

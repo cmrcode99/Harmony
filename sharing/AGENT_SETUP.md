@@ -23,11 +23,11 @@ If Harmony is already running, finish its session before updating. Installation 
 
 Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Your videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.
 
-Explain: “Harmony closes apps outside your allowed list during focus sessions. Save work before starting.”
+Explain: “Harmony force-quits apps outside your allowed list during focus sessions. Save work before starting. It opens allowed apps and minimizes their windows once. Allowed cmux stays visible; other terminals may be minimized. You can reopen any allowed app.”
 
-Help the user enable Harmony under **System Settings → Privacy & Security → Accessibility**. The user grants the permission. If macOS blocks the downloaded app, explain its approval prompt; do not disable system security.
+Help the user enable Harmony under **System Settings → Privacy & Security → Accessibility**, or **Device Control and Data Access** on macOS versions using that name. This is the window-control permission. The user approves it in System Settings, including any password or Touch ID prompt; the agent handles opening the right settings and explaining the next action. Screen Recording is only needed for the optional phone helper. If macOS blocks the downloaded app, explain its approval prompt; do not disable system security.
 
-Verify `~/.local/bin/harmony help`. When the user is ready to try focus mode, use `~/.local/bin/harmony`; exit an untimed session with `~/.local/bin/harmony exit`. Timed early exit uses the eye menu and recovery password. Do not start a timed test as part of installation.
+Verify `~/.local/bin/harmony help`. Setup itself should leave other apps and their windows alone. When the user is ready to try focus mode and has saved their work, use `~/.local/bin/harmony`; exit an untimed session with `~/.local/bin/harmony exit`. Confirm with the user that an allowed app's window minimized and can be reopened. If it did not, end the session, check the window-control permission, and quit Harmony before trying again. Timed early exit uses the eye menu and recovery password. Do not start a timed test as part of installation.
 
 For later changes, use **Allowed apps…** or **Allowed videos…** below **Move window** in the eye menu. Each opens Finder with the relevant settings area. `harmony setup apps` and `harmony setup videos` do the same while Harmony is off. Untimed focus pauses while settings are open. Timed sessions must finish first. There is no need to edit JSON for normal app or video changes.
 
@@ -58,4 +58,4 @@ Help the user grant Screen Recording permission for this optional feature. When 
 
 Tell the user how to start, exit, and reopen setup. Mention only any unfinished manual step. If they skipped phone setup, the Mac setup is complete.
 
-For later changes, edit allowed-app configuration only with Harmony off, keep `approvedPaths` and `approvedBundleIDs` synchronized, and preserve `unlockDigest`. Settings live in `~/Library/Application Support/Harmony Focus/`. `harmony uninstall` keeps settings; `--remove-data` explicitly deletes them. Do not copy someone else's settings, credentials, or phone vault.
+Use the settings window for later app and video changes. Settings live in `~/Library/Application Support/Harmony Focus/`; preserve them during updates. macOS may require permission approval again after replacing a build, even when settings are preserved. `harmony uninstall` keeps settings; `--remove-data` explicitly deletes them. See [local data and recovery](https://github.com/cmrcode99/Harmony/blob/main/docs/local-data.md) before any manual configuration edit. Do not copy someone else's settings, credentials, or phone vault.
