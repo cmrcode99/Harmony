@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -eu
 cd "${0:A:h:h}"
+app_sources=(./*.swift)
 ./tests/run-lifecycle-tests.sh
 ./tests/run-window-preparation-tests.sh
 TEST_DIR=$(mktemp -d)
@@ -12,7 +13,7 @@ swiftc -O tests/PlayerTests.swift -parse-as-library -o "$TEST_DIR/player-tests" 
 swiftc -O -parse-as-library NativeInterface.swift tests/NativeInterfaceTests.swift -o "$TEST_DIR/native-tests" -framework Cocoa
 "$TEST_DIR/native-tests"
 
-swiftc -typecheck -target "$(uname -m)-apple-macosx13.0" main.swift Setup.swift PhoneBridge.swift PhonePrompt.swift WindowPreparation.swift WindowRedraw.swift NativeInterface.swift LifecycleCore.swift -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
+swiftc -typecheck -target "$(uname -m)-apple-macosx13.0" "${app_sources[@]}" -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
 print 'PASS whole-app typecheck'
-swiftc -O -whole-module-optimization -D HARMONY_TESTING -target "$(uname -m)-apple-macosx13.0" main.swift Setup.swift PhoneBridge.swift PhonePrompt.swift WindowPreparation.swift WindowRedraw.swift NativeInterface.swift LifecycleCore.swift tests/AppIntegrationTests.swift -o "$TEST_DIR/app-tests" -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
+swiftc -O -whole-module-optimization -D HARMONY_TESTING -target "$(uname -m)-apple-macosx13.0" "${app_sources[@]}" tests/AppIntegrationTests.swift -o "$TEST_DIR/app-tests" -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
 "$TEST_DIR/app-tests" --supervised
