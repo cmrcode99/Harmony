@@ -109,12 +109,17 @@ enum SettingsSection: Equatable {
             let ids = Set(appPaths.compactMap { Bundle(path: $0)?.bundleIdentifier })
             let configuration = try AppConfiguration(unlockDigest: original.unlockDigest, approvedPaths: appPaths, approvedBundleIDs: ids).validated()
             try library.validate(videos)
-            let previous = try library.load()
+            // Preserve the exact catalog, including an invalid playlist that
+            // the user has explicitly chosen to replace. Decoding it here would
+            // make the offered repair actions fail on Save every time.
+            let previous = FileManager.default.fileExists(atPath: library.catalog.path)
+                ? try PrivateSettingsStore.read(from: library.catalog) : nil
             let updated: [LibraryVideo]? = useIncludedVideos ? nil : videos
             try library.save(updated, prune: false)
             do { try onSave?(configuration) }
             catch {
-                try? library.save(previous, prune: false)
+                if let previous { try? PrivateSettingsStore.write(previous, to: library.catalog) }
+                else { try? library.save(nil, prune: false) }
                 throw error
             }
             library.removeUnused(keeping: updated ?? [])

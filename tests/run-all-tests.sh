@@ -4,6 +4,7 @@ cd "${0:A:h:h}"
 app_sources=(./*.swift)
 ./tests/run-lifecycle-tests.sh
 ./tests/run-window-preparation-tests.sh
+./tests/run-settings-library-tests.sh
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
 swiftc -O -whole-module-optimization -target "$(uname -m)-apple-macosx13.0" SettingsWindow.swift VideoLibrary.swift Setup.swift LifecycleCore.swift PhoneBridge.swift tests/PhoneBridgeCryptoTests.swift -o "$TEST_DIR/phone-tests" -framework Cocoa -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
