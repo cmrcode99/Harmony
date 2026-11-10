@@ -19,6 +19,8 @@ Choose the route matching the folder you received:
 
 If Harmony is already running, finish its session before updating. Installation keeps existing settings and does not start focus mode. Use `~/.local/bin/harmony` directly; editing the user's shell configuration is unnecessary.
 
+Source setup automatically downloads the default playlist videos from GitHub (about 472 MiB). For an offline installation or a user who wants only their own videos, pass `--no-default-videos`. Existing local videos are preserved, and rerunning setup resumes by fetching missing files.
+
 ### 2. Help the user finish the setup window
 
 Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Allowed videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.

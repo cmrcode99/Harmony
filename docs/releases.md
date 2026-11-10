@@ -15,6 +15,7 @@ Record the macOS version, Mac architecture, commit, and scenarios tested in the 
 ## Build locally
 
 ```sh
+python3 tools/fetch-default-videos.py
 make share
 ```
 
@@ -28,4 +29,4 @@ The default application icon is bundled at `assets/Harmony.icns`; `assets/Harmon
 
 Include the MIT `LICENSE` file, then review the final package, checksum, source commit, and release notes before creating a GitHub release. Do not upload local configuration, phone vaults, credentials, or unlicensed media. Include installation requirements, known limitations, the verification record, and a rollback path.
 
-For an initial beta without redistributable media, publish source and instructions for supplying a local MP4 instead of uploading a package containing personal media. Package creation and publication remain separate operations.
+The default video files are published separately under the `default-videos-v1` GitHub release. `media/default-videos.json` records their sizes and SHA-256 hashes; setup retrieves missing files before building. `./setup.sh --no-default-videos` keeps an installation free of bundled videos. Package creation and publication remain separate operations.

@@ -1,0 +1,26 @@
+[
+  {
+    "file": "video.mp4",
+    "url": "https://github.com/cmrcode99/Harmony/releases/download/default-videos-v1/video.mp4",
+    "bytes": 84665839,
+    "sha256": "090009f3476d1584b1a185e7c3e43e098879164930253e4848e6c50a8bf2e205"
+  },
+  {
+    "file": "media/1hYlF-t1rx8.mp4",
+    "url": "https://github.com/cmrcode99/Harmony/releases/download/default-videos-v1/1hYlF-t1rx8.mp4",
+    "bytes": 269570523,
+    "sha256": "61c5b589d2f6d3e21bf8719b0e02690ade0a51043680497d8af5f7b47d321dd9"
+  },
+  {
+    "file": "media/OK_aCMUaffs.mp4",
+    "url": "https://github.com/cmrcode99/Harmony/releases/download/default-videos-v1/OK_aCMUaffs.mp4",
+    "bytes": 71436366,
+    "sha256": "7272bc04d1769672f476cf2ad4037b8c1217febb44fa618f835e83ec5af62318"
+  },
+  {
+    "file": "media/oWg9M7iHcrI.mp4",
+    "url": "https://github.com/cmrcode99/Harmony/releases/download/default-videos-v1/oWg9M7iHcrI.mp4",
+    "bytes": 68865307,
+    "sha256": "73392081b71f0a390565372d73091acbd33e87d5e1492c64925d3e3ff42ba830"
+  }
+]
