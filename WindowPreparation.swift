@@ -56,6 +56,12 @@ import ApplicationServices
         self.publish = publish
     }
 
+    deinit {
+        // Queued workers own their jobs, but must stop when their coordinator
+        // disappears even if its owner could not explicitly call cancel().
+        for job in pending.values { job.permit.revoke() }
+    }
+
     func begin() -> Int {
         cancel()
         acceptsPendingApps = true

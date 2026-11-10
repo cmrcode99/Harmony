@@ -62,19 +62,41 @@ extension App {
             self?.finishPlayerJavaScript(value, generation: generation)
         }
     }
-    private func finishPlayerJavaScript(_ value: Any?, generation: Int) {
+    func finishPlayerJavaScript(_ value: Any?, generation: Int) {
         guard generation == playerGeneration else { return }
         playerJavaScriptInFlight = false
-        if panel.isVisible, playerContainer?.controlsVisible == true, pendingSeek == nil, pendingSkips == 0,
-           let times = value as? [Double], times.count == 4,
-           times[2] == Double(playlistIndex), times[3] == Double(playbackRevision),
-           times[0].isFinite, times[1].isFinite, times[1] > 0 {
-            playbackSlider.isEnabled = true
-            playbackSlider.maxValue = times[1]
-            if NSEvent.pressedMouseButtons == 0 { playbackSlider.doubleValue = times[0] }
-            playbackSlider.toolTip = "\(formatTime(times[0])) / \(formatTime(times[1]))"
+        if panel.isVisible, playerContainer?.controlsVisible == true {
+            applyPlaybackSnapshot(value)
         }
         flushPlayerState()
+    }
+
+    /// Apply only a settled snapshot. A missing timeline means the current
+    /// media cannot be played, so previously enabled seeking must be cleared.
+    func applyPlaybackSnapshot(_ value: Any?, isDragging: Bool = NSEvent.pressedMouseButtons != 0) {
+        guard pendingSeek == nil, pendingSkips == 0 else { return }
+        guard let times = value as? [Double], times.count == 4 else {
+            clearPlaybackTimeline()
+            return
+        }
+        // User input may have superseded this result while WebKit was working.
+        guard times[2] == Double(playlistIndex), times[3] == Double(playbackRevision) else { return }
+        guard times[0].isFinite, times[1].isFinite, times[0] >= 0,
+              times[1] > 0, times[0] <= times[1] else {
+            clearPlaybackTimeline()
+            return
+        }
+        playbackSlider.isEnabled = true
+        playbackSlider.maxValue = times[1]
+        if !isDragging { playbackSlider.doubleValue = times[0] }
+        playbackSlider.toolTip = "\(formatTime(times[0])) / \(formatTime(times[1]))"
+    }
+
+    private func clearPlaybackTimeline() {
+        playbackSlider.isEnabled = false
+        playbackSlider.doubleValue = 0
+        playbackSlider.maxValue = 0
+        playbackSlider.toolTip = nil
     }
 
     func formatTime(_ seconds: Double) -> String {
