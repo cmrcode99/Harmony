@@ -2,6 +2,7 @@ import Cocoa
 import WebKit
 import CryptoKit
 import CoreServices
+import ApplicationServices
 
 /// Coordinates launch, focus enforcement, timed sessions, and recovery.
 final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDelegate, WKScriptMessageHandler {
@@ -42,7 +43,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var settingsItem: NSMenuItem?
     var videoSettingsItem: NSMenuItem?
     var applicationSettingsItem: NSMenuItem?
+    var windowControlItem: NSMenuItem?
+    var applicationWindowControlItem: NSMenuItem?
+    var windowControlPermissionState = WindowControlPermissionState()
+    var checkWindowControlPermission: () -> Bool = { AXIsProcessTrusted() }
     var settingsOpen = false
+    var settingsSuspendedFocus = false
     var focusEnabled = true
     private var suspensions = FocusSuspensions()
     var interactionsSuspended: Bool { suspensions.isSuspended }
@@ -200,6 +206,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         guard !settingsOpen, !isLocked, !unlockPromptOpen, !phoneBridge.isBusy, let current = configuration else { return }
         settingsOpen = true
         let enabled = focusEnabled
+        settingsSuspendedFocus = enabled
         let visible = panel.isVisible
         focusEnabled = false
         windowPreparation.cancel()
@@ -208,6 +215,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         defer {
             settingsOpen = false
             focusEnabled = enabled
+            settingsSuspendedFocus = false
             if visible { panel.orderFrontRegardless() }
             updatePlayer()
         }
@@ -221,13 +229,17 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         }
     }
 
-    func launchApprovedApps() {
+    func launchApprovedApps(launchMissing: Bool = true) {
         guard focusEnabled else { return }
         let generation = windowPreparation.begin()
         let running = NSWorkspace.shared.runningApplications
         for app in running where allowedApps.contains(app.bundleIdentifier ?? "") && app.bundleIdentifier != "local.harmony.focus" && app.bundleIdentifier != "com.cmuxterm.app" {
             windowPreparation.enqueue(app, generation: generation)
         }
+        // Apps already opening for this session must join the refreshed pass
+        // when their launch completes, without opening any additional apps.
+        for id in Array(launchingGenerations.keys) { launchingGenerations[id] = generation }
+        guard launchMissing else { return }
         let runningIDs = Set(running.compactMap { $0.bundleIdentifier })
         for path in approvedPaths {
             let url = URL(fileURLWithPath: path)
@@ -454,6 +466,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             if unlockPromptOpen { exitPrompt.cancel() }
             hideEye()
         }
+        refreshWindowControlPermission()
         syncStatusMenu()
     }
     func clearLock() {

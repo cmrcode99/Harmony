@@ -13,6 +13,8 @@ extension App {
         moveItem = add(menu, "Move window", #selector(toggleWindowMovement))
         settingsItem = add(menu, "Allowed apps…", #selector(openAllowedApps))
         videoSettingsItem = add(menu, "Allowed videos…", #selector(openAllowedVideos))
+        windowControlItem = add(menu, "Enable window control…", #selector(openWindowControlSettings))
+        updateWindowControlMenuItems(granted: checkWindowControlPermission())
         menu.addItem(.separator())
         add(menu, "Small", #selector(small))
         add(menu, "Medium", #selector(medium))
@@ -58,6 +60,8 @@ extension App {
         let settings = add(applicationMenu, "Apps and videos…", #selector(openSettings), ",")
         settings.isEnabled = uiReady && !isLocked
         applicationSettingsItem = settings
+        applicationWindowControlItem = add(applicationMenu, "Enable window control…", #selector(openWindowControlSettings))
+        updateWindowControlMenuItems(granted: checkWindowControlPermission())
         applicationMenu.addItem(.separator())
         let hide = add(applicationMenu, "Hide Harmony", #selector(hideFromApplicationMenu), "h")
         hide.isEnabled = uiReady

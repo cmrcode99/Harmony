@@ -31,6 +31,7 @@ struct AppIntegrationTests {
         precondition(setupMenu.items.contains(where: { $0.keyEquivalent == "q" }), "Setup has no normal Quit")
 
         let menuProbe = App()
+        menuProbe.checkWindowControlPermission = { false }
         let menu = menuProbe.makeStatusMenu()
         let titles = menu.items.map(\.title)
         let moveIndex = titles.firstIndex(of: "Move window")!
@@ -40,6 +41,7 @@ struct AppIntegrationTests {
         precondition(SettingsSection.apps.finderDirectory.path == "/Applications")
         precondition(SettingsSection.videos.finderDirectory.isFileURL)
         print("PASS settings shortcuts: menu placement, section routing and Finder directories")
+        testWindowControlPermissions(menuProbe)
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -102,6 +104,68 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testWindowControlPermissions(_ controller: App) {
+        controller.focusEnabled = false
+        controller.installApplicationMenu()
+        controller.refreshWindowControlPermission()
+        for item in [controller.windowControlItem!, controller.applicationWindowControlItem!] {
+            precondition(item.title == "Enable window control…" && item.isEnabled)
+            precondition(item.action == #selector(App.openWindowControlSettings))
+            precondition(item.toolTip?.contains("Accessibility") == true)
+        }
+        controller.checkWindowControlPermission = { true }
+        controller.refreshWindowControlPermission()
+        for item in [controller.windowControlItem!, controller.applicationWindowControlItem!] {
+            precondition(item.title == "Window control enabled" && !item.isEnabled)
+        }
+        precondition(App.windowControlSettingsURL.scheme == "x-apple.systempreferences")
+
+        var state = WindowControlPermissionState()
+        precondition(!state.update(granted: true, focusActive: true, canPrepare: true), "Initial trust duplicated normal startup preparation")
+        precondition(!state.update(granted: false, focusActive: true, canPrepare: true))
+        precondition(state.update(granted: true, focusActive: true, canPrepare: true), "New grant did not retry active focus preparation")
+        for _ in 0..<10 {
+            precondition(!state.update(granted: true, focusActive: true, canPrepare: true), "Unchanged permission continuously prepared windows")
+        }
+        precondition(!state.update(granted: false, focusActive: true, canPrepare: false))
+        precondition(!state.update(granted: true, focusActive: true, canPrepare: false), "Permission retry ran during a prompt or suspension")
+        precondition(state.update(granted: true, focusActive: true, canPrepare: true), "Deferred grant was lost")
+        precondition(!state.update(granted: false, focusActive: false, canPrepare: false))
+        precondition(!state.update(granted: true, focusActive: false, canPrepare: false))
+        precondition(!state.update(granted: true, focusActive: true, canPrepare: true), "An inactive grant duplicated the next session preparation")
+        precondition(!state.update(granted: false, focusActive: true, canPrepare: false))
+        precondition(!state.update(granted: true, focusActive: true, canPrepare: false))
+        precondition(!state.update(granted: false, focusActive: true, canPrepare: true), "Revocation preserved a stale retry")
+        precondition(state.update(granted: true, focusActive: true, canPrepare: true))
+
+        // The controller has no configured allowed IDs. Injecting the worker
+        // also prevents these headless checks from touching AX or preferences.
+        controller.windowPreparation = WindowPreparation(probe: { _, _ in .init(complete: true, eligibleWindows: 0, message: nil) }, publish: { _ in })
+        controller.windowControlPermissionState = WindowControlPermissionState()
+        controller.uiReady = true
+        controller.focusEnabled = true
+        controller.checkWindowControlPermission = { false }
+        controller.refreshWindowControlPermission()
+        controller.settingsOpen = true
+        controller.settingsSuspendedFocus = true
+        controller.focusEnabled = false
+        controller.checkWindowControlPermission = { true }
+        controller.refreshWindowControlPermission()
+        precondition(controller.windowPreparation.generation == 0, "Settings pause prepared windows")
+        controller.settingsOpen = false
+        controller.settingsSuspendedFocus = false
+        controller.focusEnabled = true
+        controller.launchingGenerations["test.harmony.pending-launch"] = 0
+        controller.refreshWindowControlPermission()
+        precondition(controller.windowPreparation.generation == 1, "Closing settings lost the newly granted permission")
+        precondition(controller.launchingGenerations["test.harmony.pending-launch"] == 1,
+                     "A pending app launch retained its stale permission generation")
+        controller.refreshWindowControlPermission()
+        precondition(controller.windowPreparation.generation == 1, "Controller repeated permission preparation")
+        controller.focusEnabled = false
+        print("PASS window control: clear menu status, settings action, one retry per grant, prompt deferral, inactive grant and revocation handling")
     }
 
     @MainActor private static func testPlaybackSnapshots(_ controller: App) {
