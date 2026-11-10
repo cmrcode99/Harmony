@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/harmony-mark.svg" width="96" alt="Harmony eye icon"></p>
+<p align="center"><img src="assets/Harmony.png" width="96" alt="Harmony app icon"></p>
 
 # Harmony
 
@@ -105,6 +105,6 @@ make share                                     # local ZIP and checksum; nothing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for code layout and checks, [release notes](CHANGELOG.md) for changes, and [SECURITY.md](SECURITY.md) to report a security issue. Agents can start with [AGENTS.md](AGENTS.md).
 
-The eye icon is original artwork generated from source. See [release preparation](docs/releases.md) for signing and package options.
+The app uses the original character icon selected by the maintainer. See [release preparation](docs/releases.md) for signing and package options.
 
 Harmony is available under the [MIT license](LICENSE). Videos, custom icons, and other third-party media retain their own licenses and permissions.

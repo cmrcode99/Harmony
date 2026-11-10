@@ -197,7 +197,7 @@ private struct SettingsButtonStyle: ButtonStyle {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
-                Image(systemName: "eye.fill").font(.system(size: 32)).foregroundStyle(.teal)
+                Image(nsImage: NSApplication.shared.applicationIconImage).resizable().scaledToFit().frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(firstRun ? "Make room for focus" : "Harmony settings").font(.title2.bold())
                     Text(section == .apps ? "Drag apps from Finder into Allowed apps." : (section == .videos ? "Drag your videos from Finder into Your videos." : "Choose your apps and videos. Your agent can help with the rest.")).foregroundStyle(.secondary)

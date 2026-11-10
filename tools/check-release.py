@@ -16,6 +16,7 @@ SOURCE_IGNORED = {'.git', '.serena', '.build', '__pycache__'}
 PRIVATE_FILES = {'configuration.json', 'phone-vault.json', 'keychain-password', 'recovery-password.txt'}
 PRIVATE_SUFFIXES = {'.pem', '.p12', '.pfx', '.key'}
 MEDIA_SUFFIXES = {'.mp4', '.icns'}
+SHIPPED_ICON = 'assets/Harmony.icns'
 HOME_PATH = re.compile(rb'/(?:Users|home)/[A-Za-z0-9_.-]+/')
 EMBEDDED_DIGEST = re.compile(rb'let unlockDigest\s*=\s*"[a-fA-F0-9]{64}"')
 
@@ -79,7 +80,7 @@ def check(root: Path, mode: str = 'source') -> list:
                 problems.append(str(relative) + ': unsupported file type')
                 continue
             if path.suffix.lower() in MEDIA_SUFFIXES:
-                if relative.as_posix() in tracked:
+                if relative.as_posix() in tracked and relative.as_posix() != SHIPPED_ICON:
                     problems.append(str(relative) + ': media asset is tracked in source')
                 continue
             # Chunking also covers executable strings without loading large files.

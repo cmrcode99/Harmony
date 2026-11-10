@@ -6,6 +6,8 @@ Production cleanup for the first public beta. This section describes development
 
 ### Changed
 
+- Restored the original character icon as the app and repository default.
+
 - Added direct Allowed apps and Allowed videos menu shortcuts with Finder, plus encrypted-vault migration metadata.
 
 - Added native drag-and-drop settings for allowed apps and user video playlists, with no rebuild required.
@@ -17,7 +19,7 @@ Production cleanup for the first public beta. This section describes development
 - Added uninstall commands that preserve settings unless removal is explicitly requested.
 - Tightened configuration validation and private storage while retaining existing data formats.
 - Prevented child executables from inheriting the app's singleton lock.
-- Added an MIT license, original icon artwork, and clearer setup, contribution, security, and release guidance.
+- Added an MIT license, the original character icon, and clearer setup, contribution, security, and release guidance.
 
 ### Verification
 

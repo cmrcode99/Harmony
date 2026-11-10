@@ -31,7 +31,7 @@ if [[ -n "${HARMONY_ICON:-}" ]]; then
   [[ -f "$HARMONY_ICON" ]] || { print -u2 'HARMONY_ICON must point to an .icns file.'; exit 1; }
   cp "$HARMONY_ICON" "$APP/Contents/Resources/Harmony.icns"
 else
-  swift tools/make-icon.swift "$APP/Contents/Resources/Harmony.icns"
+  cp assets/Harmony.icns "$APP/Contents/Resources/Harmony.icns"
 fi
 /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string Harmony' "$APP/Contents/Info.plist"
 codesign --force --sign "${HARMONY_SIGN_IDENTITY:--}" "$APP"

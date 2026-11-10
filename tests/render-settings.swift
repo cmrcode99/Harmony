@@ -6,6 +6,7 @@ import SwiftUI
     @MainActor static func main() throws {
         guard CommandLine.arguments.count == 2 else { fatalError("Pass an output PNG path") }
         NSApplication.shared.setActivationPolicy(.prohibited)
+        NSApplication.shared.applicationIconImage = NSImage(contentsOfFile: "assets/Harmony.icns")
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: temporary) }
         let config = AppConfiguration(unlockDigest: String(repeating: "a", count: 64), approvedPaths: [
