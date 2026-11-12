@@ -82,6 +82,46 @@ private final class ProbeState: @unchecked Sendable {
         await waitFor("released-owner cancellation") { releasedState.snapshot().2 }
         try? await Task.sleep(nanoseconds: 50_000_000)
         precondition(releasedState.snapshot().0 == 1, "Work retried after its coordinator was released")
+        // Every app gets its own work/retry budget. Waiting behind the other
+        // apps must not expire a job before its first or verification pass.
+        var queuedResults: [String: String] = [:]
+        let queueGate = DispatchSemaphore(value: 0)
+        let queueState = ProbeState()
+        let queued = WindowPreparation(retryInterval: 0.002, timeout: 0.04, probe: { pid, valid in
+            if pid == 20_000 {
+                _ = queueState.start()
+                _ = queueGate.wait(timeout: .now() + 1)
+                return .retry("Slow first app")
+            }
+            precondition(valid(), "Another app consumed this app's probe budget")
+            return .init(complete: true, eligibleWindows: 1, message: nil)
+        }, publish: { queuedResults = $0 })
+        let queuedGeneration = queued.begin()
+        queued.enqueue(pid: 20_000, bundleID: "test.blocker", generation: queuedGeneration)
+        await waitFor("queue blocker") { queueState.snapshot().0 == 1 }
+        for index in 0..<12 {
+            queued.enqueue(pid: pid_t(20_001 + index), bundleID: "test.queued.\(index)", generation: queuedGeneration)
+        }
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        queueGate.signal()
+        await waitFor("all queued apps") { queuedResults.count == 13 }
+        precondition((0..<12).allSatisfy { queuedResults["test.queued.\($0)"] == "Minimized (verified)" },
+                     "Queue waiting was counted as failed window preparation")
+
+        var retryResults: [String: String] = [:]
+        let retryState = ProbeState()
+        let retrying = WindowPreparation(retryInterval: 0.01, timeout: 0.035, probe: { _, _ in
+            _ = retryState.start()
+            return .retry("Not ready")
+        }, publish: { retryResults = $0 })
+        let retryGeneration = retrying.begin()
+        retrying.enqueue(pid: 30_000, bundleID: "test.retry", generation: retryGeneration)
+        await waitFor("retry budget exhausted") { !retryResults.isEmpty }
+        let stoppedAt = retryState.snapshot().0
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        precondition(stoppedAt > 1 && retryState.snapshot().0 == stoppedAt,
+                     "Waiting for windows retried without a bound")
+        print("PASS fair preparation: queued apps each verified; per-app retries remain bounded")
         print("PASS window preparation: nonblocking enqueue, off-main work, activation cancellation, stale-generation rejection, no retries after cancel")
         print("PASS window preparation lifetime: releasing the owner revokes in-flight work without retaining the coordinator")
     }

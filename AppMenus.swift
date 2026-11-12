@@ -7,6 +7,9 @@ extension App {
         let menu = NSMenu(title: "Harmony focus controls")
         menu.delegate = self
         menu.autoenablesItems = false
+        openAndMinimizeItem = add(menu, "Open and minimize all apps", #selector(openAndMinimizeApps))
+        openAndMinimizeItem?.toolTip = "Open your allowed apps and minimize their windows, leaving cmux visible."
+        menu.addItem(.separator())
         visibleItem = add(menu, "Hide Harmony", #selector(toggle))
         muteItem = add(menu, "Unmute", #selector(sound))
         muteItem.identifier = NSUserInterfaceItemIdentifier("mute")

@@ -34,6 +34,8 @@ struct AppIntegrationTests {
         menuProbe.checkWindowControlPermission = { false }
         let menu = menuProbe.makeStatusMenu()
         let titles = menu.items.map(\.title)
+        precondition(menu.items.first?.title == "Open and minimize all apps" &&
+                     menu.items.first?.action == #selector(App.openAndMinimizeApps), "Explicit app launch action is not first")
         let moveIndex = titles.firstIndex(of: "Move window")!
         precondition(titles[moveIndex + 1] == "Allowed apps" && titles[moveIndex + 2] == "Allowed videos")
         precondition(menu.items[moveIndex + 1].action == #selector(App.openAllowedApps))
@@ -42,6 +44,7 @@ struct AppIntegrationTests {
         precondition(SettingsSection.videos.finderDirectory.isFileURL)
         print("PASS settings shortcuts: menu placement, section routing and Finder directories")
         testWindowControlPermissions(menuProbe)
+        testExplicitAppLaunch()
         testTimedSettingsLock()
         testBundledAppApproval()
         testSettingsWindowCompletions()
@@ -198,6 +201,38 @@ struct AppIntegrationTests {
         precondition(controller.settingsItem!.isEnabled && controller.videoSettingsItem!.isEnabled && controller.applicationSettingsItem!.isEnabled,
                      "App and video editing did not return after the timer")
         print("PASS timed settings: all app/video entry points disabled until the session ends")
+    }
+
+    @MainActor private static func testExplicitAppLaunch() {
+        let controller = App()
+        controller.windowPreparation = WindowPreparation(probe: { _, _ in
+            .init(complete: true, eligibleWindows: 0, message: "Test")
+        }, publish: { _ in })
+        controller.windowPreparation.isEnabled = { false } // Never operate on real windows.
+        var opened: [URL] = []
+        controller.preparationApps = { [] }
+        controller.openApprovedApplication = { url, completion in opened.append(url); completion(nil) }
+        controller.uiReady = true
+        controller.focusEnabled = true
+        controller.checkWindowControlPermission = { true }
+        controller.launchApprovedApps()
+        precondition(opened.isEmpty, "Normal session preparation opened closed apps")
+        controller.openAndMinimizeApps()
+        precondition(!opened.isEmpty, "Explicit action did not open any missing approved apps")
+        opened.removeAll()
+        controller.focusEnabled = false
+        controller.openAndMinimizeApps()
+        controller.focusEnabled = true
+        controller.settingsOpen = true
+        controller.openAndMinimizeApps()
+        controller.settingsOpen = false
+        controller.unlockPromptOpen = true
+        controller.openAndMinimizeApps()
+        controller.unlockPromptOpen = false
+        controller.checkWindowControlPermission = { false }
+        controller.openAndMinimizeApps()
+        precondition(opened.isEmpty, "Explicit action opened apps while inactive, busy or unpermitted")
+        print("PASS explicit app launch: startup leaves closed apps closed; menu action is guarded")
     }
 
     @MainActor private static func testWindowControlPermissions(_ controller: App) {

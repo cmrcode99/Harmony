@@ -57,7 +57,7 @@ If you received a prebuilt package, unzip it and run **Install Harmony.command**
 
 ## Focus sessions
 
-**Harmony force-quits apps outside your allowed list. Save work before starting.** Finder and System Settings stay available. Approved apps are opened and their windows minimized once; approved cmux stays unminimized. Other terminal apps need to be allowed and may be minimized. Reopen any approved app when you need it; Harmony does not keep minimizing it during the session.
+**Harmony force-quits apps outside your allowed list. Save work before starting.** Finder and System Settings stay available. Starting Harmony minimizes already-open approved app windows once; it leaves closed apps closed and approved cmux visible. To launch the whole approved set, choose **Open and minimize all apps** at the top of the eye menu. Other terminal apps need to be allowed and may be minimized. Reopen any approved app when you need it; Harmony does not keep minimizing it during the session.
 
 ```sh
 ~/.local/bin/harmony          # start untimed focus mode

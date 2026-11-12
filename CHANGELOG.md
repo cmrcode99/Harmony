@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased — 1.7.7
+## Unreleased — 1.7.8
+
+- Starting a session now minimizes already-open allowed app windows and leaves closed apps closed; cmux stays visible.
+- Added **Open and minimize all apps** at the top of the eye menu to explicitly launch the full allowed set.
+- Fixed queued apps exhausting their window-preparation time before receiving a turn. Each app now has its own bounded work/retry budget, and background helper processes are not queued for minimization.
+
+## 1.7.7
 
 - Use native tab buttons that accept the first click when settings are inactive, instead of relying on sidebar list selection.
 

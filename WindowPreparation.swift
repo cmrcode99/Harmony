@@ -24,14 +24,14 @@ import ApplicationServices
         let pid: pid_t
         let id: String
         let generation: Int
-        let deadline: TimeInterval
+        var remainingBudget: TimeInterval // Main actor; queue waiting never consumes it.
         let permit = Permit()
         var quietPasses = 0 // Accessed only by the main actor.
-        init(pid: pid_t, id: String, generation: Int, deadline: TimeInterval) {
-            self.pid = pid; self.id = id; self.generation = generation; self.deadline = deadline
+        init(pid: pid_t, id: String, generation: Int, budget: TimeInterval) {
+            self.pid = pid; self.id = id; self.generation = generation; self.remainingBudget = budget
         }
         func shouldProceed() -> Bool {
-            permit.isActive() && ProcessInfo.processInfo.systemUptime < deadline
+            permit.isActive()
         }
     }
 
@@ -73,11 +73,15 @@ import ApplicationServices
 
     func enqueue(_ app: NSRunningApplication, generation expected: Int) {
         let id = app.bundleIdentifier ?? String(app.processIdentifier)
-        guard isEnabled(), acceptsPendingApps, expected == generation, !app.isTerminated,
+        guard !app.isTerminated else { return }
+        enqueue(pid: app.processIdentifier, bundleID: id, generation: expected)
+    }
+
+    func enqueue(pid: pid_t, bundleID id: String, generation expected: Int) {
+        guard isEnabled(), acceptsPendingApps, expected == generation, pid > 0,
               id != "com.cmuxterm.app", !userActivatedIDs.contains(id),
-              pending[app.processIdentifier] == nil else { return }
-        let job = Job(pid: app.processIdentifier, id: id, generation: generation,
-                      deadline: ProcessInfo.processInfo.systemUptime + timeout)
+              pending[pid] == nil else { return }
+        let job = Job(pid: pid, id: id, generation: generation, budget: timeout)
         pending[job.pid] = job
         schedule(job)
     }
@@ -106,27 +110,31 @@ import ApplicationServices
 
     private func schedule(_ job: Job, delay: TimeInterval = 0) {
         let probe = self.probe
+        let passBudget = min(0.4, max(0, job.remainingBudget - delay))
         queue.asyncAfter(deadline: .now() + delay) { [weak self, job] in
-            guard job.shouldProceed() else {
-                Task { @MainActor [weak self] in self?.receive(.retry("Window preparation timed out"), for: job) }
+            guard job.shouldProceed(), passBudget > 0 else {
+                Task { @MainActor [weak self] in self?.receive(.retry("Window preparation timed out"), for: job, spent: delay) }
                 return
             }
             // Yield fairly between apps even if one has many slow AX windows.
-            let passDeadline = ProcessInfo.processInfo.systemUptime + 0.4
+            let started = ProcessInfo.processInfo.systemUptime
+            let passDeadline = started + passBudget
             let result = probe(job.pid, { job.shouldProceed() && ProcessInfo.processInfo.systemUptime < passDeadline })
-            Task { @MainActor [weak self] in self?.receive(result, for: job) }
+            let spent = ProcessInfo.processInfo.systemUptime - started + delay
+            Task { @MainActor [weak self] in self?.receive(result, for: job, spent: spent) }
         }
     }
 
-    private func receive(_ result: ProbeResult, for job: Job) {
+    private func receive(_ result: ProbeResult, for job: Job, spent: TimeInterval) {
         guard pending[job.pid] === job, job.generation == generation, job.permit.isActive() else { return }
         guard isEnabled() else { cancel(); return }
+        job.remainingBudget -= spent
         job.quietPasses = result.complete ? job.quietPasses + 1 : 0
         if job.quietPasses >= 3 || (result.complete && result.message != nil) {
             pending.removeValue(forKey: job.pid)
             job.permit.revoke()
             setResult(result.message ?? (result.eligibleWindows > 0 ? "Minimized (verified)" : "Running without a minimizable window"), for: job.id)
-        } else if ProcessInfo.processInfo.systemUptime >= job.deadline {
+        } else if job.remainingBudget <= 0 {
             pending.removeValue(forKey: job.pid)
             job.permit.revoke()
             setResult(result.message ?? "Window could not be minimized; left unchanged", for: job.id)

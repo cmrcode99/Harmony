@@ -21,6 +21,7 @@ extension App {
     static let windowControlSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
 
     func updateWindowControlMenuItems(granted: Bool) {
+        openAndMinimizeItem?.isEnabled = granted && canOpenAndMinimizeApps
         for item in [windowControlItem, applicationWindowControlItem].compactMap({ $0 }) {
             item.title = "Enable window control"
             item.isHidden = granted

@@ -45,6 +45,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var applicationSettingsItem: NSMenuItem?
     var windowControlItem: NSMenuItem?
     var applicationWindowControlItem: NSMenuItem?
+    var openAndMinimizeItem: NSMenuItem?
     var windowControlPermissionState = WindowControlPermissionState()
     var checkWindowControlPermission: () -> Bool = { AXIsProcessTrusted() }
     var settingsOpen = false
@@ -87,6 +88,13 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     var sessionObservers: [NSObjectProtocol] = []
     var redrawObservers: [NSObjectProtocol] = []
     var launchingGenerations: [String: Int] = [:]
+    var preparationApps: () -> [NSRunningApplication] = { NSWorkspace.shared.runningApplications }
+    var openApprovedApplication: (URL, @escaping (NSRunningApplication?) -> Void) -> Void = { url, completion in
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        configuration.hides = false
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, _ in completion(app) }
+    }
     private let commandReceipts = HarmonyCommandReceipts()
     lazy var windowPreparation: WindowPreparation = {
         let controller = WindowPreparation()
@@ -257,11 +265,19 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         editor.show()
     }
 
-    func launchApprovedApps(launchMissing: Bool = true) {
+    var canOpenAndMinimizeApps: Bool {
+        uiReady && focusEnabled && !settingsOpen && !interactionsSuspended && !phoneBridge.isBusy && !unlockPromptOpen
+    }
+    @objc func openAndMinimizeApps() {
+        guard canOpenAndMinimizeApps, checkWindowControlPermission() else { return }
+        launchApprovedApps(launchMissing: true)
+    }
+
+    func launchApprovedApps(launchMissing: Bool = false) {
         guard focusEnabled else { return }
         let generation = windowPreparation.begin()
-        let running = NSWorkspace.shared.runningApplications
-        for app in running where isApproved(app) && app.bundleIdentifier != "local.harmony.focus" && app.bundleIdentifier != "com.cmuxterm.app" {
+        let running = preparationApps()
+        for app in running where app.activationPolicy == .regular && isApproved(app) && app.bundleIdentifier != "local.harmony.focus" && app.bundleIdentifier != "com.cmuxterm.app" {
             windowPreparation.enqueue(app, generation: generation)
         }
         // Apps already opening for this session must join the refreshed pass
@@ -275,15 +291,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
             let alreadyLaunching = launchingGenerations[id] != nil
             launchingGenerations[id] = generation
             if alreadyLaunching { continue }
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = false
-            configuration.hides = false
-            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { [weak self] app, _ in
+            openApprovedApplication(url) { [weak self] app in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
                     guard let requestedGeneration = self.launchingGenerations.removeValue(forKey: id),
                           self.focusEnabled, let app = app else { return }
-                    if id != "com.cmuxterm.app" {
+                    if id != "com.cmuxterm.app", app.activationPolicy == .regular {
                         self.windowPreparation.enqueue(app, generation: requestedGeneration)
                     }
                 }

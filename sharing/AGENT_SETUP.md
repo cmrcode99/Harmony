@@ -25,7 +25,7 @@ Source setup automatically downloads the default playlist videos from GitHub (ab
 
 Ask which apps they want available during focus time, including their agent and terminal. The user drags applications into **Allowed apps** (or uses Add apps), then adds videos to **Allowed videos** if they want. Show them the Remove and reorder controls. They then save their generated **Harmony recovery password** privately. Never request that password in chat.
 
-Explain: “Harmony force-quits apps outside your allowed list during focus sessions. Save work before starting. It opens allowed apps and minimizes their windows once. Allowed cmux stays visible; other terminals may be minimized. You can reopen any allowed app.”
+Explain: “Harmony force-quits apps outside your allowed list during focus sessions. Save work before starting. It minimizes already-open allowed app windows once and leaves closed apps closed. Allowed cmux stays visible; other terminals may be minimized. Use Open and minimize all apps at the top of the eye menu when you want to launch the entire allowed set. You can reopen any allowed app.”
 
 Help the user enable Harmony under **System Settings → Privacy & Security → Accessibility**, or **Device Control and Data Access** on macOS versions using that name. This is the window-control permission. The user approves it in System Settings, including any password or Touch ID prompt; the agent handles opening the right settings and explaining the next action. Screen Recording is only needed for the optional phone helper. If macOS blocks the downloaded app, explain its approval prompt; do not disable system security.
 
