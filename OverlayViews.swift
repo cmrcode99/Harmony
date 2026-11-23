@@ -2,8 +2,30 @@ import Cocoa
 import WebKit
 
 final class UnlockField: NSSecureTextField {
+    var allowsPasswordPaste: () -> Bool = { false }
+    var onPasswordPaste: () -> Void = {}
+
+    @discardableResult func insertPastedPassword(_ value: String) -> Bool {
+        guard allowsPasswordPaste(), !value.isEmpty else { return false }
+        if let editor = currentEditor() as? NSTextView {
+            editor.insertText(value, replacementRange: editor.selectedRange())
+        } else { stringValue = value }
+        onPasswordPaste()
+        return true
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command), ["v", "x"].contains(event.charactersIgnoringModifiers?.lowercased() ?? "") { return true }
+        if event.modifierFlags.contains(.command) {
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "v":
+                if allowsPasswordPaste(), let value = NSPasteboard.general.string(forType: .string) {
+                    insertPastedPassword(value)
+                }
+                return true
+            case "x": return true
+            default: break
+            }
+        }
         return super.performKeyEquivalent(with: event)
     }
 }

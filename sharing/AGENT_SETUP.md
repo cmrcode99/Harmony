@@ -54,7 +54,7 @@ With Harmony off, run:
 
 The user enters their Harmony recovery password and existing four-digit Screen Time passcode into the local windows. Harmony stores an encrypted copy on this Mac; it does not create or change Apple's Screen Time settings. Never ask the user to paste either secret into chat or a command.
 
-Help the user grant Screen Recording permission for this optional feature. When they want to test it, have them open iPhone Mirroring at an empty Screen Time passcode prompt, start Harmony, and use `~/.local/bin/harmony phone`. The user enters their Harmony password locally. Stop if the target is not recognized; do not guess codes or repeat phone input.
+Help the user grant Screen Recording permission for this optional feature. When they want to test it, have them open iPhone Mirroring at an empty Screen Time passcode prompt and run `~/.local/bin/harmony phone`. This also works with focus mode off. The user enters their Harmony password locally. Stop if the target is not recognized; do not guess codes or repeat phone input.
 
 ### 4. Leave a short handoff
 

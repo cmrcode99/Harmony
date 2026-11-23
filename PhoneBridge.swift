@@ -5,12 +5,37 @@ import ScreenCaptureKit
 import Vision
 import CoreML
 
+enum PhonePastePolicy {
+    static let lastUseKey = "phonePasswordPasteLastUse"
+
+    static func isAvailable(lastUse: Date?, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let lastUse else { return true }
+        return calendar.compare(now, to: lastUse, toGranularity: .day) == .orderedDescending
+    }
+
+    static func recordSuccessfulEntry(pasted: Bool, in defaults: UserDefaults = .standard, now: Date = Date()) {
+        if pasted { defaults.set(now, forKey: lastUseKey) }
+    }
+
+    static func isAvailable(in defaults: UserDefaults = .standard, now: Date = Date()) -> Bool {
+        isAvailable(lastUse: defaults.object(forKey: lastUseKey) as? Date, now: now)
+    }
+}
+
 @MainActor final class PhoneBridge {
     let unlockDigest: String
     var onAccess: ((Bool) -> Void)?
     var isEnabled: () -> Bool = { true }
     private var task: Task<Void, Never>?
-    func cancel() { task?.cancel() }
+    private var preparedClipboard: Int?
+    func cancel() {
+        task?.cancel()
+        clearPreparedClipboard()
+    }
+    private func clearPreparedClipboard() {
+        if let preparedClipboard { PhoneDailyClipboard.clearIfOwned(preparedClipboard) }
+        preparedClipboard = nil
+    }
     func checkAuthorization() throws {
         try Task.checkCancellation()
         guard isEnabled() else { throw bridgeError("Harmony is no longer enabled. No further phone input will be sent.") }
@@ -45,7 +70,7 @@ import CoreML
         guard !Task.isCancelled, isEnabled() else { return nil }
         UserDefaults.standard.set(title, forKey: "phoneStatus")
         UserDefaults.standard.set(detail, forKey: "phoneStatusDetail")
-        return await prompt.present(title: title, detail: detail, primary: button, secureInput: true, keyboardOnly: true)
+        return await prompt.present(title: title, detail: detail, primary: button, secureInput: true, keyboardOnly: true, allowsPasswordPaste: { PhonePastePolicy.isAvailable() })
     }
     private static func key(_ password: String, salt: Data, context: Data? = nil) -> SymmetricKey {
         HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: Data(password.utf8)), salt: salt,
@@ -65,12 +90,13 @@ import CoreML
               pin.utf8.allSatisfy({ (48...57).contains($0) }) else { throw NSError(domain: "Harmony", code: 2) }
         return pin
     }
-    func run() {
+    func run(onFinish: (() -> Void)? = nil) {
         guard !busy else { return }
         busy = true
         task = Task { @MainActor in
             await self.runFlow()
             self.finish()
+            onFinish?()
         }
     }
     private func runFlow() async {
@@ -89,11 +115,25 @@ import CoreML
             await message("Open iPhone Mirroring first", "Navigate to an empty Enter Screen Time Passcode prompt, then run harmony phone.")
             return
         }
+        guard FileManager.default.fileExists(atPath: vaultURL.path) else {
+            await message("Phone helper not set up", "Run harmony setup phone while Harmony is off to configure your Screen Time code. No input was sent.")
+            return
+        }
         onAccess?(true)
         do { try await revealMirror(mirror, requireFocus: false) }
         catch { await message("Open iPhone Mirroring", error.localizedDescription); return }
-        let detail = "Enter your 50-character Harmony password. The phone code is typed only into the Screen Time passcode prompt."
+        guard !Task.isCancelled, isEnabled() else { return }
+        let canPaste = PhonePastePolicy.isAvailable()
+        let pasteHint = canPaste
+            ? "⌘V is available for one phone unlock today. Failed attempts do not use it."
+            : "Today’s pasted phone unlock has been used. Type your password; paste returns tomorrow."
+        preparedClipboard = canPaste ? PhoneDailyClipboard.prepareIfAvailable(expectedDigest: unlockDigest) : nil
+        defer { clearPreparedClipboard() }
+        let copyHint = preparedClipboard == nil ? "" : " Your password is on this Mac’s clipboard. Press ⌘V."
+        let detail = "Enter your Harmony recovery password. " + pasteHint + copyHint + " The phone code is typed only into the Screen Time passcode prompt."
         guard let password = await ask("Unlock phone entry", detail, button: "Verify and type") else { return }
+        clearPreparedClipboard()
+        let usedPaste = prompt.didPastePassword
         let hash = SHA256.hash(data: Data(password.utf8)).map { String(format: "%02x", $0) }.joined()
         let expected = unlockDigest
         guard hash == expected else {
@@ -103,10 +143,6 @@ import CoreML
         let pin: String
         do {
             try checkAuthorization()
-            guard FileManager.default.fileExists(atPath: vaultURL.path) else {
-                await message("Phone helper not set up", "Finish your current session, then ask your agent to run harmony setup phone. You can keep using Harmony on your Mac without the phone helper. No input was sent.")
-                return
-            }
             pin = try Self.open(JSONDecoder().decode(Vault.self, from: PrivateSettingsStore.read(from: vaultURL)), password: password)
         } catch {
             await message("Could not unlock encrypted phone code", "No input was sent. The encrypted record may belong to an older password."); return
@@ -116,6 +152,7 @@ import CoreML
             try await revealMirror(mirror)
             try checkAuthorization()
             try await self.typeIfScreenTime(pin, mirror: mirror)
+            PhonePastePolicy.recordSuccessfulEntry(pasted: usedPaste)
             UserDefaults.standard.set(true, forKey: "screenCaptureGranted")
             UserDefaults.standard.set("Phone code entered; acceptance not verified", forKey: "phoneStatus")
         } catch {

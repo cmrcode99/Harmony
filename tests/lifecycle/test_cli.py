@@ -152,8 +152,14 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(calls,[])
     def test_off_control_commands_are_rejected(self):
         self.env['TEST_RUNNING']='0'
-        for action in ['hide','unhide','exit','phone']:
+        for action in ['hide','unhide','exit']:
             result,calls=self.run_cli(action);self.assertEqual(result.returncode,1);self.assertEqual(calls,[])
+    def test_off_phone_opens_standalone_helper(self):
+        self.env['TEST_RUNNING'] = '0'
+        result, calls = self.run_cli('phone')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls, [['-n', str(self.root / 'Applications/Harmony.app'), '--args', '--phone-only']])
+
     def test_cold_start_and_lock(self):
         self.env['TEST_RUNNING']='0'
         result,calls=self.run_cli();self.assertEqual(result.returncode,0)

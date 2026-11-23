@@ -25,9 +25,11 @@ Open **Allowed apps…** or **Allowed videos…** below **Move window** in the e
 
 Custom videos and their playlist are in `~/Library/Application Support/Harmony Focus/Media/`. Removing a video removes Harmony’s copy only. To return to the bundled playlist, choose **Use included playlist**. User media is preserved by default during uninstall. Advanced configuration edits must preserve `version` and `unlockDigest` and keep app paths and bundle identifiers synchronized.
 
+The phone-entry password prompt permits **⌘V for one successful phone-code entry per local calendar day**. Invalid passwords, cancellation, and failed phone entry do not consume the allowance. After it is used, type the recovery password until the next day. The allowance survives restarting Harmony; timed-session recovery prompts keep paste disabled.
+
 ## Passwords and phone setup
 
-Save the generated recovery password during setup. Harmony stores its hash, not a recoverable copy. The optional `phone-vault.json` contains the encrypted Screen Time code; its key depends on the recovery password.
+Save the generated recovery password during setup. The configuration stores its hash. Optional daily phone paste stores a recoverable copy in this Mac’s login Keychain under **Harmony daily phone paste**. When the daily paste is available, opening the phone password prompt copies it to this Mac’s clipboard. Harmony marks it concealed, then clears its own copy after 90 seconds or when the phone flow ends. Delete that Keychain item to discontinue automatic copying. The optional `phone-vault.json` contains the encrypted Screen Time code; its key depends on the recovery password.
 
 Do not replace `unlockDigest` by itself. If you deliberately create a new configuration or recovery password, configure the phone helper again with the existing phone code. Keep private backups out of source control and chat logs.
 

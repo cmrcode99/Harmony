@@ -2,9 +2,10 @@ import Cocoa
 
 // These tests use temporary files only: no windows, permission requests, or focus.
 @MainActor final class PhonePrompt {
+    var didPastePassword = false
     func activate() {}
     func present(title: String, detail: String, primary: String, secureInput: Bool,
-                 cancel: Bool = true, keyboardOnly: Bool = false) async -> String? { nil }
+                 cancel: Bool = true, keyboardOnly: Bool = false, allowsPasswordPaste: @escaping () -> Bool = { false }) async -> String? { nil }
 }
 
 @main struct SettingsLibraryRegressionTests {

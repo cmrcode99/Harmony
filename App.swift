@@ -215,11 +215,13 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
         tickLock()
         startRecoveryHelper()
         let playbackTimer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            self?.tickLock()
-            self?.pollPlaybackPosition()
-            if let self = self, Date().timeIntervalSince(self.lastAppScan) >= 2 {
-                self.lastAppScan = Date()
-                self.closeUnapprovedApps()
+            guard let self else { return }
+            self.tickLock()
+            self.pollPlaybackPosition()
+            let now = Date()
+            if now.timeIntervalSince(self.lastAppScan) >= 2 {
+                self.lastAppScan = now
+                self.sweepUnapprovedApps()
             }
         }
         playbackTimer.tolerance = 0.1
@@ -305,15 +307,18 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavigationDe
     }
     func closeUnapprovedApps() {
         tickLock()
-        guard !interactionsSuspended, focusEnabled else { return }
+        sweepUnapprovedApps()
+    }
+    private func sweepUnapprovedApps() {
+        guard !interactionsSuspended, focusEnabled, lockWallEnd <= 0 || isLocked else { return }
         for app in NSWorkspace.shared.runningApplications { closeUnapprovedApp(app) }
     }
     func closeUnapprovedApp(_ app: NSRunningApplication) {
+        guard focusEnabled, !app.isTerminated, app.activationPolicy == .regular,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         if let path = app.bundleURL?.path,
            path.hasPrefix("/System/Library/") { return }
-        guard focusEnabled, !app.isTerminated, app.activationPolicy == .regular,
-              !isApproved(app),
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        guard !isApproved(app) else { return }
         app.forceTerminate()
     }
     func enforceFocus(_ app: NSRunningApplication) {

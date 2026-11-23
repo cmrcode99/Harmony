@@ -3,8 +3,9 @@ import CryptoKit
 
 // The audit tests do not create windows, request permissions, or send input.
 @MainActor final class PhonePrompt {
+    var didPastePassword = false
     func activate() {}
-    func present(title: String, detail: String, primary: String, secureInput: Bool, cancel: Bool = true, keyboardOnly: Bool = false) async -> String? { nil }
+    func present(title: String, detail: String, primary: String, secureInput: Bool, cancel: Bool = true, keyboardOnly: Bool = false, allowsPasswordPaste: @escaping () -> Bool = { false }) async -> String? { nil }
 }
 @main struct PhoneBridgeTests {
     static let label = CGRect(x: 120, y: 320, width: 410, height: 30)
@@ -102,7 +103,44 @@ import CryptoKit
         print("PASS configuration: ASCII digest normalization, malformed input rejection, private permissions, symlink rejection, atomic replacement failure")
     }
 
+    static func checkDailyPastePolicy() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        let used = calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 0, minute: 30))!
+        let sameDay = calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 23))!
+        let nextDay = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 0))!
+        precondition(PhonePastePolicy.isAvailable(lastUse: nil, now: used, calendar: calendar))
+        precondition(!PhonePastePolicy.isAvailable(lastUse: used, now: sameDay, calendar: calendar), "DST granted a second paste on the same day")
+        precondition(PhonePastePolicy.isAvailable(lastUse: used, now: nextDay, calendar: calendar))
+        precondition(!PhonePastePolicy.isAvailable(lastUse: nextDay, now: used, calendar: calendar), "Clock rollback restored paste")
+        let domain = "harmony-paste-test-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        PhonePastePolicy.recordSuccessfulEntry(pasted: false, in: defaults, now: used)
+        precondition(defaults.object(forKey: PhonePastePolicy.lastUseKey) == nil, "Typed entry consumed paste")
+        PhonePastePolicy.recordSuccessfulEntry(pasted: true, in: defaults, now: used)
+        let reopened = UserDefaults(suiteName: domain)!
+        precondition(reopened.object(forKey: PhonePastePolicy.lastUseKey) as? Date == used, "Restart lost the allowance usage")
+        precondition(!PhonePastePolicy.isAvailable(in: reopened, now: used))
+        print("PASS daily phone paste: one per calendar day, DST, rollback, restart persistence, typed entry preserved")
+    }
+
     @MainActor static func main() throws {
+        let clipboard = NSPasteboard.withUniqueName()
+        defer { clipboard.releaseGlobally() }
+        guard let owned = PhoneDailyClipboard.publish("test fixture", to: clipboard) else {
+            preconditionFailure("Could not publish to a private test pasteboard")
+        }
+        precondition(clipboard.types?.contains(.init("org.nspasteboard.ConcealedType")) == true)
+        precondition(clipboard.string(forType: .string) == "test fixture")
+        clipboard.clearContents()
+        clipboard.setString("new copy", forType: .string)
+        PhoneDailyClipboard.clearIfOwned(owned, on: clipboard)
+        precondition(clipboard.string(forType: .string) == "new copy")
+        PhoneDailyClipboard.clearIfOwned(clipboard.changeCount, on: clipboard)
+        precondition(clipboard.string(forType: .string) == nil)
+
+        checkDailyPastePolicy()
         try checkConfigurationStorage()
         let password = "dummy-test-password-never-used-for-real"
         let first = try PhoneBridge.seal("1234", password: password)

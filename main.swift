@@ -1,9 +1,42 @@
 import Cocoa
 
+@MainActor func launchDelegate(phoneOnly: Bool, initialCommand: HarmonyCommand?,
+                               lockDeadline: TimeInterval, now: TimeInterval) -> NSApplicationDelegate? {
+    if phoneOnly {
+        guard initialCommand == nil, FocusDeadline.restored(lockDeadline, now: now) == nil else { return nil }
+        return PhoneEntryApp()
+    }
+    let delegate = App()
+    delegate.initialCommand = initialCommand
+    return delegate
+}
+
 // Keep process dispatch and singleton ownership separate from the app UI.
 #if HARMONY_TESTING
 MainActor.assumeIsolated { AppIntegrationTests.main() }
 #else
+let phoneOnly = CommandLine.arguments.contains("--phone-only")
+if phoneOnly && CommandLine.arguments.contains(where: {
+    ["--launch-action", "--supervised", "--configure-only", "--configure-phone", "--install-app", "--command", "--is-running"].contains($0)
+}) {
+    fputs("Phone-only entry cannot be combined with another launch mode.\n", stderr)
+    exit(2)
+}
+if CommandLine.arguments.contains("--remember-daily-paste") {
+    guard CommandLine.arguments.count == 2 else { exit(2) }
+    do {
+        let data = FileHandle.standardInput.readDataToEndOfFile()
+        guard let password = String(data: data, encoding: .utf8) else { exit(2) }
+        try MainActor.assumeIsolated {
+            let config = try AppSetup.loadConfiguration(from: AppSetup.configurationURL)
+            try PhoneDailyClipboard.remember(password, expectedDigest: config.unlockDigest)
+        }
+        exit(0)
+    } catch {
+        fputs("Could not enroll daily phone paste. No clipboard change was made.\n", stderr)
+        exit(1)
+    }
+}
 if CommandLine.arguments.contains("--install-app") {
     do {
         let target = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Harmony.app")
@@ -56,13 +89,26 @@ if supervised {
     }, acquire: { instanceLock.acquire() })
     guard shouldStart else { exit(0) }
 } else if !instanceLock.acquire() {
+    if phoneOnly {
+        let phone = HarmonyCommand(action: "phone", hours: nil)
+        var rejection: String?
+        if HarmonyCommandChannel.send(phone, onRejection: { rejection = $0 }) { exit(0) }
+        fputs((rejection ?? "The running Harmony instance did not accept phone entry. Close setup if it is open, then try again.") + "\n", stderr)
+        exit(1)
+    }
     fputs("Another instance of Harmony is already running.\n", stderr)
     exit(1)
 }
 
-let app = NSApplication.shared
-let delegate = App()
-delegate.initialCommand = initialCommand
-app.delegate = delegate
-app.run()
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    guard let delegate = launchDelegate(phoneOnly: phoneOnly, initialCommand: initialCommand,
+                                        lockDeadline: UserDefaults.standard.double(forKey: "lockEnd"),
+                                        now: Date().timeIntervalSince1970) else {
+        fputs("A timed Harmony session is recovering. Use phone entry in the recovered session.\n", stderr)
+        exit(1)
+    }
+    app.delegate = delegate
+    withExtendedLifetime(delegate) { app.run() }
+}
 #endif

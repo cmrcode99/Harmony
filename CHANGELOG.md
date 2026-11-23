@@ -2,6 +2,8 @@
 
 ## Unreleased — 1.7.8
 
+- Allow pasting the recovery password for one completed phone-code entry per local calendar day. Failed attempts keep the allowance; typed entry and timed-session recovery keep their existing behavior.
+
 - Starting a session now minimizes already-open allowed app windows and leaves closed apps closed; cmux stays visible.
 - Added **Open and minimize all apps** at the top of the eye menu to explicitly launch the full allowed set.
 - Fixed queued apps exhausting their window-preparation time before receiving a turn. Each app now has its own bounded work/retry budget, and background helper processes are not queued for minimization.

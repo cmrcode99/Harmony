@@ -49,6 +49,8 @@ struct AppIntegrationTests {
         testBundledAppApproval()
         testSettingsWindowCompletions()
         testSettingsTabClicks()
+        testPhonePasswordPaste()
+        testPhoneOnlyLaunch()
 
         let item = NSStatusBar.system.statusItem(withLength: 0)
         item.isVisible = false
@@ -117,6 +119,40 @@ struct AppIntegrationTests {
         testTimerExtension(controller)
         testSettingsLibrary()
         testPlaybackSnapshots(controller)
+    }
+
+    @MainActor private static func testPhoneOnlyLaunch() {
+        let now: TimeInterval = 100
+        let session = launchDelegate(phoneOnly: true, initialCommand: nil, lockDeadline: now, now: now) as? PhoneEntryApp
+        precondition(session != nil, "Standalone phone entry created a focus controller")
+        for action in ["show", "lock", "extend", "hide", "unhide"] {
+            precondition(session?.handleCommand(action).rejection != nil)
+        }
+        for action in ["phone", "phone", "exit"] { precondition(session!.handleCommand(action).rejection == nil) }
+        precondition(launchDelegate(phoneOnly: true, initialCommand: nil, lockDeadline: now + 1, now: now) == nil)
+        let lock = HarmonyCommand(action: "lock", hours: 1)
+        precondition(launchDelegate(phoneOnly: true, initialCommand: lock, lockDeadline: 0, now: now) == nil)
+        let focus = launchDelegate(phoneOnly: false, initialCommand: lock, lockDeadline: now + 1, now: now) as? App
+        precondition(focus?.initialCommand == lock)
+        print("PASS phone-only launch is isolated from focus and yields to timed recovery")
+    }
+
+    @MainActor private static func testPhonePasswordPaste() {
+        let field = UnlockField(frame: .zero)
+        var available = true
+        var pasted = false
+        precondition(!field.insertPastedPassword("dummy-password"), "Recovery fields allowed paste by default")
+        field.allowsPasswordPaste = { available }
+        field.onPasswordPaste = { pasted = true }
+        precondition(!field.insertPastedPassword(""), "Empty clipboard counted as paste")
+        precondition(!pasted)
+        precondition(field.insertPastedPassword("dummy-password"))
+        precondition(pasted && field.stringValue == "dummy-password")
+        available = false
+        pasted = false
+        precondition(!field.insertPastedPassword("replacement"))
+        precondition(!pasted && field.stringValue == "dummy-password", "Used daily allowance still allowed paste")
+        print("PASS phone password field: default block, allowed paste, usage tracking, exhausted allowance")
     }
 
     @MainActor private static func testSettingsTabClicks() {

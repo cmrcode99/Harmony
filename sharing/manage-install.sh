@@ -139,6 +139,12 @@ if [[ "$mode" == install ]]; then
   committed=1
   print 'Installed Harmony and its recovery service. Focus mode was not started.'
 else
+  if [[ "${2:-}" == --remove-data && -f "$preferences" ]] &&
+     [[ "$(/usr/bin/plutil -extract dailyPhonePasteEnrolled raw -o - "$preferences" 2>/dev/null)" == true ]]; then
+    result=0
+    /usr/bin/security delete-generic-password -s local.harmony.focus.daily-phone-paste -a 'Harmony recovery password' >/dev/null 2>&1 || result=$?
+    (( result == 0 || result == 44 )) || fail 'Could not remove the daily paste Keychain item. The installation will be restored.'
+  fi
   committed=1
   if [[ "${2:-}" == --remove-data ]]; then
     rm -rf -- "$state"

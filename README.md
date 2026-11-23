@@ -99,7 +99,7 @@ The Mac app works without phone setup. If you want it, ask your agent to follow 
 
 You choose Screen Time limits on your iPhone and connect iPhone Mirroring first. Then, with Harmony off, run `harmony setup phone`. Enter your **Harmony recovery password** and your existing **Screen Time passcode** in the local windows. These are different credentials. Harmony keeps an encrypted copy of the phone code; it does not change Screen Time settings.
 
-Screen Recording permission is needed for this experimental helper. To use it, open Mirroring at an empty Screen Time passcode prompt and run `harmony phone` during a Harmony session. Reconfigure it after changing either credential.
+Screen Recording permission is needed for this experimental helper. To use it, open Mirroring at an empty Screen Time passcode prompt and run `harmony phone`. The helper works both during a focus session and on its own. Reconfigure it after changing either credential.
 
 ## Development
 

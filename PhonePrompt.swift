@@ -14,6 +14,8 @@ import Cocoa
     private var alert: NSAlert?
     private var panel: PromptPanel?
     private var input: UnlockField?
+    private(set) var didPastePassword = false
+    private var allowsPasswordPaste: () -> Bool = { false }
     private var completion: ((String?) -> Void)?
     private var requestID: UUID?
     private var observationTokens: [NSObjectProtocol] = []
@@ -35,8 +37,10 @@ import Cocoa
         recordWindowState()
     }
 
-    func present(title: String, detail: String, primary: String, secureInput: Bool, cancel: Bool = true, keyboardOnly: Bool = false) async -> String? {
+    func present(title: String, detail: String, primary: String, secureInput: Bool, cancel: Bool = true, keyboardOnly: Bool = false, allowsPasswordPaste: @escaping () -> Bool = { false }) async -> String? {
         guard completion == nil, !Task.isCancelled else { return nil }
+        didPastePassword = false
+        self.allowsPasswordPaste = allowsPasswordPaste
         let id = UUID()
         requestID = id
         return await withTaskCancellationHandler {
@@ -62,6 +66,8 @@ import Cocoa
         if secureInput {
             let field = UnlockField(frame: NSRect(x: 0, y: 0, width: 420, height: 24))
             field.placeholderString = "Type your password exactly"
+            field.allowsPasswordPaste = allowsPasswordPaste
+            field.onPasswordPaste = { [weak self] in self?.didPastePassword = true }
             alert.accessoryView = field
             input = field
         }
