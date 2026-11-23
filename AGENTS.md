@@ -9,6 +9,7 @@ Read [sharing/AGENT_SETUP.md](sharing/AGENT_SETUP.md) first. It is the common gu
 - See CONTRIBUTING.md for the code map. Keep lifecycle, menu, overlay, and player changes in their respective files; preserve timer, password, and recovery behavior.
 - Run `make check` after code changes. Use `./build.sh --stage-only /tmp/Harmony.app` with a new destination to inspect a build without replacing or starting the installed app.
 - Run the live UI smoke test only with focus sessions off. It uses isolated preferences and disabled enforcement. Device permissions and actual phone input still require deliberate manual testing.
+- Signing decides whether macOS permissions survive a rebuild; check with `codesign -d -r- ~/Applications/Harmony.app`. When the installed app is signed with an identity in the keychain (`certificate leaf` in that output), `build.sh` reuses it, and the Accessibility and Screen Recording grants and the Keychain access for the daily phone paste (`local.harmony.focus.daily-phone-paste`) carry over. An ad-hoc app (`cdhash` in that output) is a new identity on every rebuild and loses all three: don't reinstall one for a cosmetic change, and tell the owner what he must re-approve when you do. Never switch an installed app between identities without asking; that also drops the grants.
 - `make share` creates a local package and checksum in `dist/`; it does not publish them. Run the release checks described in docs/releases.md before distributing a package.
 
 ## Private data

@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -eu
 cd "${0:A:h:h}"
+SDKROOT=$(python3 tools/select-sdk.py); export SDKROOT
 app_sources=(./*.swift)
 ./tests/run-lifecycle-tests.sh
 ./tests/run-window-preparation-tests.sh

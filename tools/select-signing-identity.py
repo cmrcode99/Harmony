@@ -27,8 +27,11 @@ def select_identity(installed_app=None, override=None, command=run):
         if not certificate.exists():
             return '-'
         fingerprint = hashlib.sha1(certificate.read_bytes()).hexdigest().upper()
-    identities = command(['/usr/bin/security', 'find-identity', '-v', '-p', 'codesigning'])
-    available = re.findall(r'^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"', identities.stdout, re.MULTILINE)
+    # A self-signed local identity is listed as untrusted and still signs, so it counts as
+    # available. An identity with any other problem (expired, revoked) does not.
+    identities = command(['/usr/bin/security', 'find-identity', '-p', 'codesigning'])
+    available = re.findall(r'^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"[^"\n]*"(?:\s+\(CSSMERR_TP_NOT_TRUSTED\))?\s*$',
+                           identities.stdout, re.MULTILINE)
     if identities.returncode == 0 and fingerprint in [value.upper() for value in available]:
         print('Reusing the installed Harmony signing identity.', file=sys.stderr)
         return fingerprint

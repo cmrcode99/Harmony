@@ -36,8 +36,18 @@ class SigningSelectionTests(unittest.TestCase):
             if self.has_certificate:
                 Path(arguments[2].split('=', 1)[1] + '0').write_bytes(self.certificate)
             return subprocess.CompletedProcess(arguments, 0 if self.display_ok else 1, '', '')
-        self.assertEqual(arguments, ['/usr/bin/security', 'find-identity', '-v', '-p', 'codesigning'])
+        self.assertEqual(arguments, ['/usr/bin/security', 'find-identity', '-p', 'codesigning'])
         return subprocess.CompletedProcess(arguments, 0, self.identities, '')
+
+    def test_update_reuses_untrusted_self_signed_identity(self):
+        self.identities = (f'  Matching identities\n  1) {self.fingerprint} "Local identity" (CSSMERR_TP_NOT_TRUSTED)\n'
+                           '     1 identities found\n\n  Valid identities only\n     0 valid identities found\n')
+        self.assertEqual(signing.select_identity(self.app, command=self.command), self.fingerprint)
+
+    def test_expired_identity_stops_before_replacing_the_app(self):
+        self.identities = f'  1) {self.fingerprint} "Local identity" (CSSMERR_TP_CERT_EXPIRED)\n     1 identities found\n'
+        with self.assertRaisesRegex(ValueError, 'unavailable'):
+            signing.select_identity(self.app, command=self.command)
 
     def test_fresh_install_and_explicit_override_do_not_query_keychain(self):
         self.assertEqual(signing.select_identity(command=self.command), '-')

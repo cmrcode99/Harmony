@@ -5,6 +5,8 @@
 - Starting a session now minimizes already-open allowed app windows and leaves closed apps closed; cmux stays visible.
 - Added **Open and minimize all apps** at the top of the eye menu to explicitly launch the full allowed set.
 - Fixed queued apps exhausting their window-preparation time before receiving a turn. Each app now has its own bounded work/retry budget, and background helper processes are not queued for minimization.
+- Source updates now reuse a self-signed signing identity that is not marked trusted, so a locally signed install keeps its macOS permissions across rebuilds.
+- Builds and checks now pick an installed macOS SDK (26 or newer) that the developer tools can compile SwiftUI against when the default one cannot, as on Command Line Tools without Xcode. `SDKROOT` still overrides the choice.
 
 ## 1.7.7
 

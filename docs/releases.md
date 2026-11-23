@@ -21,9 +21,11 @@ make share
 
 This creates a local ZIP and SHA-256 checksum in `dist/`; it does not upload anything. Apple Silicon is the supported and tested target. Build on an Apple Silicon Mac (or set `HARMONY_ARCH=arm64`) and verify the checksum from the directory containing the archive.
 
+`tools/select-sdk.py` chooses the macOS SDK for every build and check: the default one when it compiles SwiftUI, otherwise the newest installed SDK (26+) that does. Set `SDKROOT` to choose one yourself.
+
 The default application icon is bundled at `assets/Harmony.icns`; `assets/Harmony.png` is its documentation preview. To use your own redistributable icon, set `HARMONY_ICON=/absolute/path/to/custom.icns`.
 
-`HARMONY_SIGN_IDENTITY` selects an existing code-signing identity. New installations and staged builds use ad-hoc signing by default. Source updates reuse the installed app’s certificate when its signing identity is available in the current keychain search list. If it is unavailable, the build stops before replacement: unlock that keychain or explicitly select an identity. Set `HARMONY_SIGN_IDENTITY=-` to deliberately switch to ad-hoc signing; macOS permissions may need approval again. The build does not create certificates or change keychain trust. Signing is not notarization. Keep signing credentials outside the repository. Distribution signing and Apple notarization need a separately configured release process; do not claim them until the resulting artifact is verified.
+`HARMONY_SIGN_IDENTITY` selects an existing code-signing identity. New installations and staged builds use ad-hoc signing by default. Source updates reuse the installed app’s certificate when its signing identity is available in the current keychain search list; a self-signed identity counts even when it is not marked trusted, and with it Accessibility, Screen Recording and Keychain access survive rebuilds. If it is unavailable, the build stops before replacement: unlock that keychain or explicitly select an identity. Set `HARMONY_SIGN_IDENTITY=-` to deliberately switch to ad-hoc signing; macOS permissions may need approval again. The build does not create certificates or change keychain trust. Signing is not notarization. Keep signing credentials outside the repository. Distribution signing and Apple notarization need a separately configured release process; do not claim them until the resulting artifact is verified.
 
 ## Publish
 

@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -eu
 cd "${0:A:h:h}"
+SDKROOT=$(python3 tools/select-sdk.py); export SDKROOT
 app_sources=(./*.swift)
 workdir=$(mktemp -d /tmp/harmony-friend-tests.XXXXXX)
 trap 'rm -rf "$workdir"' EXIT

@@ -43,7 +43,9 @@ try:
                    '-target', f'{platform.machine()}-apple-macosx13.0', *sources, '-o', str(executable)]
         for framework in ('Cocoa', 'WebKit', 'Vision', 'ScreenCaptureKit', 'ApplicationServices'):
             command += ['-framework', framework]
-        subprocess.run(command, check=True)
+        sdk = subprocess.run([sys.executable, str(ROOT / 'tools/select-sdk.py')], check=True,
+                             stdout=subprocess.PIPE, text=True).stdout.strip()
+        subprocess.run(command, check=True, env={**os.environ, 'SDKROOT': sdk})
         subprocess.run(['codesign', '--force', '--sign', '-', str(app)], check=True)
         try:
             subprocess.run([str(executable), '--ui-smoke', '--supervised', *sys.argv[1:]], check=True, timeout=30 if '--playlist-smoke' in sys.argv else 12)

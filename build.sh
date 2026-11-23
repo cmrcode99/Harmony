@@ -21,6 +21,9 @@ if (( stage_only )); then
 else
   SIGN_IDENTITY=$(python3 tools/select-signing-identity.py "$DEST")
 fi
+# Compile against an SDK the installed toolchain can use; SDKROOT set by the caller wins.
+SDKROOT=$(python3 tools/select-sdk.py)
+export SDKROOT
 if (( stage_only )); then
   STAGE=$(mktemp -d "${TMPDIR:-/tmp}/harmony-build.XXXXXX")
 else

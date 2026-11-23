@@ -12,5 +12,5 @@ share:
 
 preview-settings:
 	mkdir -p .build
-	swiftc -O $(filter-out main.swift,$(wildcard *.swift)) tests/render-settings.swift -o .build/settings-preview -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
+	sdk=$$(python3 tools/select-sdk.py) && SDKROOT="$$sdk" swiftc -O $(filter-out main.swift,$(wildcard *.swift)) tests/render-settings.swift -o .build/settings-preview -framework Cocoa -framework WebKit -framework Vision -framework ScreenCaptureKit -framework ApplicationServices
 	.build/settings-preview .build/settings-preview.png
